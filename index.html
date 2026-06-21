@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contrast — Colour Accessibility Checker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root{
+    --paper:#FBFAF6; --ink:#1A1A18; --soft:#6B6A63;
+    --line:#E4E1D8; --line2:#D6D2C6; --card:#FFFFFF;
+    --pass:#3F7A4F; --fail:#C0492F; --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  body{font-family:'Outfit',system-ui,sans-serif;background:var(--paper);color:var(--ink);
+    line-height:1.3;padding:48px 40px 110px;max-width:1180px;margin:0 auto;}
+  .kicker{font-size:13px;font-weight:500;letter-spacing:0;text-transform:lowercase;color:var(--soft);margin-bottom:14px}
+  h1{font-size:clamp(56px,13vw,140px);font-weight:800;letter-spacing:-.055em;line-height:.82;margin-bottom:24px;text-transform:lowercase}
+  h1 .dim{color:var(--line2)}
+  h2{font-size:clamp(22px,3.4vw,32px);font-weight:700;letter-spacing:-.035em;line-height:.98;color:var(--ink);margin-bottom:20px;text-transform:lowercase}
+  section{margin-bottom:60px}
+
+  .inrow{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+  textarea{font-family:'Outfit',sans-serif;font-size:15px;font-weight:500;width:340px;height:118px;resize:vertical;
+    padding:14px 16px;border:1.5px solid var(--line2);border-radius:var(--radius);background:var(--card);color:var(--ink);outline:none;}
+  textarea:focus{border-color:var(--ink)}
+  .btn{font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;padding:13px 22px;border-radius:999px;
+    border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer;transition:transform .08s,opacity .15s;}
+  .btn:hover{transform:translateY(-1px)}
+  .btn.ghost{background:transparent;color:var(--ink)}
+  .btn.ghost:hover{background:var(--ink);color:var(--paper)}
+  .btn.sm{padding:9px 16px;font-size:13px}
+  .pickrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .hint{font-size:13px;color:var(--soft);margin-top:10px;font-weight:400}
+
+  .chips{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}
+  .chip{display:flex;align-items:center;gap:10px;padding:8px 10px 8px 8px;border:1.5px solid var(--line);border-radius:12px;background:var(--card)}
+  .chip .sw{width:40px;height:40px;border-radius:8px;border:1px solid rgba(0,0,0,.08);position:relative;overflow:hidden;cursor:pointer}
+  .chip .sw input{position:absolute;inset:-8px;opacity:0;cursor:pointer}
+  .chip .hx-in{font-family:'Outfit';font-weight:700;font-size:14px;border:none;background:transparent;width:88px;outline:none;color:var(--ink);text-transform:uppercase}
+  .chip .lbl{font-size:11px;color:var(--soft);font-weight:500}
+  .chip .x{margin-left:2px;border:none;background:transparent;color:var(--soft);cursor:pointer;font-size:18px;line-height:1;padding:2px 4px;border-radius:6px}
+  .chip .x:hover{background:var(--line);color:var(--ink)}
+  .addchip{border-style:dashed;cursor:pointer;color:var(--soft);font-weight:700;font-size:14px;padding:0 18px;min-height:58px;display:flex;align-items:center}
+  .addchip:hover{border-color:var(--ink);color:var(--ink)}
+
+  /* drag canvas */
+  .canvas{position:relative;height:300px;border:1.5px dashed var(--line2);border-radius:20px;
+    background:radial-gradient(circle at 20% 20%, rgba(0,0,0,.015), transparent 60%);overflow:hidden;touch-action:none}
+  .disc{position:absolute;width:96px;height:96px;border-radius:50%;cursor:grab;user-select:none;
+    box-shadow:0 6px 20px rgba(0,0,0,.14);border:2px solid rgba(255,255,255,.5);display:flex;align-items:flex-end;justify-content:center;
+    padding-bottom:10px;transition:box-shadow .15s, transform .05s}
+  .disc:active{cursor:grabbing;box-shadow:0 14px 36px rgba(0,0,0,.26);z-index:30}
+  .disc .dt{font-size:11px;font-weight:800;letter-spacing:.02em;background:rgba(255,255,255,.82);color:#111;padding:2px 7px;border-radius:6px}
+  .canvas .ord{position:absolute;left:16px;bottom:14px;font-size:12px;font-weight:600;color:var(--soft)}
+
+  .legend{display:flex;gap:26px;flex-wrap:wrap;align-items:center;font-size:13px;font-weight:500;color:var(--soft)}
+  .legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle}
+  .toolbar{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:22px}
+
+  /* roles */
+  .roles{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:26px}
+  .role{display:flex;align-items:center;gap:10px;padding:8px 14px 8px 8px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);cursor:pointer;position:relative}
+  .role:hover{border-color:var(--ink)}
+  .role .rsw{width:34px;height:34px;border-radius:8px;border:1px solid rgba(0,0,0,.1)}
+  .role .rl{font-size:11px;color:var(--soft);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .role .rh{font-size:13px;font-weight:700}
+  .pop{position:absolute;top:calc(100% + 8px);left:0;z-index:40;background:var(--card);border:1.5px solid var(--line2);
+    border-radius:12px;padding:10px;display:flex;gap:8px;flex-wrap:wrap;width:208px;box-shadow:0 14px 34px rgba(0,0,0,.16)}
+  .pop .ps{width:32px;height:32px;border-radius:7px;border:1px solid rgba(0,0,0,.1);cursor:pointer}
+  .pop .ps:hover{outline:2px solid var(--ink);outline-offset:1px}
+
+  /* mockups */
+  .mkgrid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .mk{border-radius:18px;overflow:hidden;border:1px solid var(--line);min-height:300px;padding:22px;position:relative;font-family:'Outfit',sans-serif}
+  .mk-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;font-size:13px;font-weight:600}
+  .mk-btn{font-size:12px;font-weight:700;padding:8px 15px;border-radius:999px;display:inline-block;cursor:default}
+  .mk h3{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1.02;margin-bottom:10px}
+  .mk p{font-size:14px;font-weight:400;margin-bottom:18px;max-width:90%}
+  .mk-cta{display:flex;gap:10px;margin-bottom:22px}
+  .mk-card{border-radius:13px;padding:16px;display:flex;flex-direction:column;gap:7px}
+  .mk-card b{font-size:14px;font-weight:700}.mk-card small{font-size:12px}
+  .stat{border-radius:12px;padding:14px 16px}
+  .bars{display:flex;align-items:flex-end;gap:8px;height:80px;margin-top:14px}
+  .bars i{flex:1;border-radius:5px 5px 0 0;display:block}
+  .ph-art{height:120px;border-radius:14px;margin-bottom:14px}
+  .ph-bar{height:6px;border-radius:3px;position:relative;overflow:hidden;margin:10px 0 16px}
+  .ph-bar i{position:absolute;left:0;top:0;bottom:0;display:block;border-radius:3px}
+  .tick{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:500;margin-bottom:8px}
+  .tick span{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+
+  /* vision + mockup captions */
+  .vision{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .vpill{font-family:'Outfit';font-size:13px;font-weight:600;padding:8px 15px;border-radius:999px;border:1.5px solid var(--line2);background:var(--card);color:var(--soft);cursor:pointer}
+  .vpill.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .visexp{margin:0 0 22px;font-size:13px;color:var(--soft);font-weight:500;max-width:560px}
+  .mkitem{display:flex;flex-direction:column}
+  .mkcap{font-size:12.5px;color:var(--soft);font-weight:500;margin-top:11px;line-height:1.45}
+  .mkcap b{color:var(--ink);font-weight:700}
+
+  /* footer — Any Key logotype */
+  footer.made{margin-top:60px;padding-top:30px;border-top:1px solid var(--line);display:flex;align-items:flex-end;gap:15px}
+  footer.made .byline{font-size:14px;color:var(--soft);font-weight:500;padding-bottom:6px}
+  .aklock{display:inline-flex;align-items:flex-end;gap:12px;text-decoration:none;color:var(--ink)}
+  .aklock:hover{opacity:.6}
+  .aklock .amark{font-family:'Outfit',sans-serif;font-size:40px;font-weight:800;line-height:.78;letter-spacing:-.05em}
+  .aklock .akword{font-family:'Outfit',sans-serif;font-size:32px;font-weight:800;line-height:.86;letter-spacing:-.055em;text-transform:lowercase}
+
+  /* matrix */
+  .mwrap{overflow-x:auto;padding-bottom:6px}
+  table.matrix{border-collapse:separate;border-spacing:6px}
+  table.matrix th,table.matrix td{padding:0}
+  .corner{width:64px;height:64px}
+  .hsw{width:108px;height:64px;border-radius:10px;display:flex;align-items:flex-end;padding:8px;border:1px solid rgba(0,0,0,.07)}
+  .hsw.row{width:64px;height:108px}
+  .hsw .t{font-size:11px;font-weight:700}
+  .cell{width:108px;height:108px;border-radius:10px;cursor:pointer;position:relative;overflow:hidden;border:1px solid rgba(0,0,0,.05);
+    transition:transform .08s,box-shadow .15s;display:flex;flex-direction:column;justify-content:space-between;padding:9px 10px}
+  .cell:hover{transform:scale(1.04);box-shadow:0 8px 24px rgba(0,0,0,.16);z-index:5}
+  .cell .samp{font-size:24px;font-weight:700;line-height:1}
+  .cell .foot{display:flex;justify-content:space-between;align-items:center}
+  .cell .ratio{font-size:13px;font-weight:700}
+  .cell .dots{display:flex;gap:3px}
+  .cell .dots i{width:7px;height:7px;border-radius:50%;display:block;border:1px solid rgba(0,0,0,.18)}
+  .cell.diag{background:repeating-linear-gradient(45deg,var(--line) 0 6px,transparent 6px 12px),var(--card);cursor:default;border-style:dashed}
+  .cell.diag:hover{transform:none;box-shadow:none}
+
+  .overlay{position:fixed;inset:0;background:rgba(20,20,18,.42);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:30px;z-index:50}
+  .overlay.on{display:flex}
+  .modal{background:var(--paper);border-radius:20px;max-width:760px;width:100%;max-height:88vh;overflow:auto;padding:34px}
+  .modal .close{float:right;border:none;background:transparent;font-size:26px;cursor:pointer;color:var(--soft);line-height:1}
+  .pairhead{display:flex;border-radius:12px;overflow:hidden;margin:6px 0 26px;border:1px solid var(--line)}
+  .pairhead .half{flex:1;padding:22px 20px;min-height:120px;display:flex;flex-direction:column;justify-content:space-between}
+  .pairhead .half .big{font-size:26px;font-weight:800}
+  .pairhead .half .sm{font-size:12px;font-weight:600;opacity:.85}
+  .scoreline{display:flex;align-items:baseline;gap:14px;margin-bottom:22px}
+  .scoreline .frac{font-size:46px;font-weight:800;letter-spacing:-.02em}
+  .scoreline .of{font-size:15px;color:var(--soft);font-weight:500}
+  .checks{display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;margin-bottom:28px}
+  .check{display:flex;align-items:center;gap:11px;font-size:14px;font-weight:600;padding:9px 0;border-bottom:1px solid var(--line)}
+  .check .v{margin-left:auto;font-weight:700}
+  .badge{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:800;flex-shrink:0}
+  .badge.ok{background:var(--pass)}.badge.no{background:var(--fail)}
+  .fonts h3{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--soft);margin:8px 0 14px}
+  .fsample{border-radius:12px;padding:20px 22px;margin-bottom:12px;border:1px solid rgba(0,0,0,.06)}
+  .fsample .r{display:flex;align-items:baseline;gap:14px;margin-bottom:9px;flex-wrap:wrap}
+  .fsample .r:last-child{margin-bottom:0}
+  .fsample .tag{font-size:10px;font-weight:700;letter-spacing:.08em;opacity:.55;width:60px;flex-shrink:0}
+
+  @media(max-width:760px){.mkgrid{grid-template-columns:1fr}}
+  @media(max-width:640px){body{padding:32px 20px 80px}textarea{width:100%}.checks{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="kicker">Accessibility · WCAG 2.1 + APCA · Live mockups</div>
+  <h1>Colour<br><span class="dim">contrast.</span></h1>
+</header>
+
+<section id="inputSec">
+  <h2>Build your palette</h2>
+  <div class="inrow">
+    <div>
+      <textarea id="paste" placeholder="#1F2A44&#10;#E94F37&#10;rgb(106,141,115)&#10;…up to 10"></textarea>
+      <div class="hint">Hex (#FFF / #FFFFFF) or rgb(). One per line, comma or space.</div>
+    </div>
+    <button class="btn" id="loadBtn">Load palette →</button>
+  </div>
+  <div class="pickrow">
+    <button class="btn ghost sm" id="dropBtn">⛏ Eyedropper</button>
+    <button class="btn ghost sm" id="clipBtn">⧉ Paste a colour</button>
+    <button class="btn ghost sm" id="randBtn">⤫ Random</button>
+  </div>
+  <div class="chips" id="chips"></div>
+</section>
+
+<section id="canvasSec">
+  <h2>Arrange — drag to reorder</h2>
+  <div class="canvas" id="canvas"><div class="ord" id="ord"></div></div>
+</section>
+
+<section id="mockSec">
+  <div class="toolbar">
+    <div>
+      <h2 style="margin-bottom:12px">Live mockups</h2>
+      <div class="legend"><span>Click a role to reassign · updates every preview instantly</span></div>
+    </div>
+    <button class="btn ghost sm" id="shuffleBtn">↻ Shuffle roles</button>
+  </div>
+  <div class="roles" id="roles"></div>
+  <div class="vision" id="vision"></div>
+  <p class="visexp" id="visexp"></p>
+  <div class="mkgrid" id="mkgrid"></div>
+</section>
+
+<section id="matrixSec">
+  <div class="toolbar">
+    <div>
+      <h2 style="margin-bottom:12px">Contrast matrix</h2>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--pass)"></span>pass</span>
+        <span><span class="dot" style="background:var(--fail)"></span>fail</span>
+        <span>4 dots = AA · AAA · Non-text · APCA</span>
+        <span>row = bg · column = text</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn ghost sm" id="htmlBtn">Export HTML</button>
+      <button class="btn sm" id="pdfBtn">Export PDF</button>
+    </div>
+  </div>
+  <div class="mwrap"><table class="matrix" id="matrix"></table></div>
+</section>
+
+<footer class="made">
+  <span class="byline">made by</span>
+  <a href="https://www.anykeystudio.com/" target="_blank" rel="noopener" class="aklock" aria-label="Any Key Studio">
+    <span class="akword">any&nbsp;key</span>
+  </a>
+</footer>
+
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+<div id="reportStage" style="position:fixed;left:-99999px;top:0;width:820px"></div>
+
+<script>
+/* ---------- colour math ---------- */
+function clamp(n,a,b){return Math.max(a,Math.min(b,n));}
+function parseColor(raw){
+  if(!raw) return null;
+  let s=(''+raw).trim().toLowerCase();
+  let m=s.match(/rgba?\(([^)]+)\)/);
+  if(m){let p=m[1].split(/[ ,/]+/).filter(Boolean).map(Number);
+    if(p.length>=3&&p.slice(0,3).every(x=>!isNaN(x)))return[clamp(p[0]|0,0,255),clamp(p[1]|0,0,255),clamp(p[2]|0,0,255)];}
+  s=s.replace('#','');
+  if(/^[0-9a-f]{3}$/.test(s))s=s.split('').map(c=>c+c).join('');
+  if(/^[0-9a-f]{6}$/.test(s))return[parseInt(s.slice(0,2),16),parseInt(s.slice(2,4),16),parseInt(s.slice(4,6),16)];
+  return null;
+}
+function toHex(c){return '#'+c.map(x=>clamp(x|0,0,255).toString(16).padStart(2,'0')).join('').toUpperCase();}
+function rgba(c,a){return `rgba(${c[0]},${c[1]},${c[2]},${a})`;}
+function lin(c){c/=255;return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4);}
+function luminance(c){return 0.2126*lin(c[0])+0.7152*lin(c[1])+0.0722*lin(c[2]);}
+function satOf(c){const r=c[0]/255,g=c[1]/255,b=c[2]/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b);const l=(mx+mn)/2;if(mx===mn)return 0;const d=mx-mn;return l>0.5?d/(2-mx-mn):d/(mx+mn);}
+function onColor(c){return luminance(c)>0.42?'#161513':'#FBFAF6';}
+function wcagRatio(a,b){const L1=luminance(a),L2=luminance(b);const hi=Math.max(L1,L2),lo=Math.min(L1,L2);return(hi+0.05)/(lo+0.05);}
+function apca(txt,bg){
+  const Rco=0.2126729,Gco=0.7151522,Bco=0.0721750,Strc=2.4,Bthr=0.022,Bclmp=1.414;
+  const sBoW=1.14,sWoB=1.14,loBoW=0.027,loWoB=0.027,loClip=0.1,dYmin=0.0005;
+  const nBG=0.56,nTXT=0.57,rTXT=0.62,rBG=0.65;
+  const Y=c=>Rco*Math.pow(c[0]/255,Strc)+Gco*Math.pow(c[1]/255,Strc)+Bco*Math.pow(c[2]/255,Strc);
+  let Yt=Y(txt),Yb=Y(bg);
+  if(Yt<=Bthr)Yt+=Math.pow(Bthr-Yt,Bclmp);
+  if(Yb<=Bthr)Yb+=Math.pow(Bthr-Yb,Bclmp);
+  if(Math.abs(Yb-Yt)<dYmin)return 0;
+  let out;
+  if(Yb>Yt){let S=(Math.pow(Yb,nBG)-Math.pow(Yt,nTXT))*sBoW;out=S<loClip?0:S-loBoW;}
+  else{let S=(Math.pow(Yb,rBG)-Math.pow(Yt,rTXT))*sWoB;out=S>-loClip?0:S+loWoB;}
+  return out*100;
+}
+function evaluate(fg,bg){
+  const r=wcagRatio(fg,bg),lc=apca(fg,bg);
+  const checks=[
+    {key:'AA',label:'WCAG AA · normal text',pass:r>=4.5,val:r.toFixed(2)+':1'},
+    {key:'AAA',label:'WCAG AAA · normal text',pass:r>=7,val:r.toFixed(2)+':1'},
+    {key:'NONTEXT',label:'Non-text 1.4.11 · UI & icons',pass:r>=3,val:r.toFixed(2)+':1'},
+    {key:'APCA',label:'APCA · body text (Lc 60+)',pass:Math.abs(lc)>=60,val:'Lc '+lc.toFixed(1)}
+  ];
+  return {ratio:r,lc,checks,score:checks.filter(c=>c.pass).length,total:checks.length};
+}
+function sizeMatrix(fg,bg){const r=wcagRatio(fg,bg),lc=Math.abs(apca(fg,bg));
+  return[{t:'Normal text (<18.66px)',aa:r>=4.5,aaa:r>=7,apca:lc>=75},
+    {t:'Large text (≥18.66px / 14px bold)',aa:r>=3,aaa:r>=4.5,apca:lc>=60},
+    {t:'UI components & graphics',aa:r>=3,aaa:r>=3,apca:lc>=45}];}
+
+/* ---------- state ---------- */
+let palette=[];
+let positions=[];          // {x,y} parallel to palette, for canvas
+let roleOverrides={};       // role -> hex
+const DEFAULT=['#26323D','#E6492D','#F4C95D','#5E8C61','#E9E1D4'];
+const ROLE_KEYS=['background','surface','text','primary','accent'];
+const ROLE_LABELS={background:'Background',surface:'Surface',text:'Text',primary:'Primary',accent:'Accent'};
+let vision='normal';
+/* colour-vision-deficiency simulation matrices (HCIRN, applied to sRGB) */
+const CVD={
+  protanopia:[0.567,0.433,0,0.558,0.442,0,0,0.242,0.758],
+  deuteranopia:[0.625,0.375,0,0.70,0.30,0,0,0.30,0.70],
+  tritanopia:[0.95,0.05,0,0,0.433,0.567,0,0.475,0.525]
+};
+function simulateCVD(c,type){const m=CVD[type];if(!m)return c;
+  return [clamp(c[0]*m[0]+c[1]*m[1]+c[2]*m[2],0,255),clamp(c[0]*m[3]+c[1]*m[4]+c[2]*m[5],0,255),clamp(c[0]*m[6]+c[1]*m[7]+c[2]*m[8],0,255)].map(x=>x|0);}
+function colDist(a,b){const rm=(a[0]+b[0])/2,dr=a[0]-b[0],dg=a[1]-b[1],db=a[2]-b[2];return Math.sqrt((2+rm/256)*dr*dr+4*dg*dg+(2+(255-rm)/256)*db*db);}
+const VIS=[
+  ['normal','Normal','Standard colour vision — the baseline.'],
+  ['deuteranopia','Deuteranopia','Reduced green sensitivity. The most common type — ~6% of men. Red and green converge.'],
+  ['protanopia','Protanopia','Reduced red sensitivity — ~1% of men. Reds darken and shift toward green.'],
+  ['tritanopia','Tritanopia','Reduced blue sensitivity — rare. Blue and yellow become hard to tell apart.']
+];
+
+function autoRoles(){
+  if(!palette.length)return null;
+  const byLum=[...palette].sort((a,b)=>luminance(a)-luminance(b));
+  const background=byLum[byLum.length-1];
+  const text=byLum[0];
+  const surface=byLum.length>2?byLum[byLum.length-2]:background;
+  let rest=palette.filter(c=>c!==background&&c!==text&&c!==surface);
+  if(!rest.length)rest=palette.filter(c=>c!==background&&c!==text);
+  if(!rest.length)rest=[text];
+  const bySat=[...rest].sort((a,b)=>satOf(b)-satOf(a));
+  const primary=bySat[0]||text;
+  const accent=bySat[1]||primary;
+  return {background,surface,text,primary,accent};
+}
+function roles(){
+  const a=autoRoles();if(!a)return null;
+  ROLE_KEYS.forEach(k=>{const h=roleOverrides[k];if(h){const c=palette.find(p=>toHex(p)===h);if(c)a[k]=c;}});
+  return a;
+}
+
+/* ---------- render orchestrator ---------- */
+function render(){renderChips();renderCanvas();renderRoles();renderVision();renderMockups();renderMatrix();}
+function simRoles(){const R=roles();if(!R)return null;if(vision==='normal')return R;const o={};ROLE_KEYS.forEach(k=>o[k]=simulateCVD(R[k],vision));return o;}
+
+/* chips */
+function renderChips(){
+  const box=document.getElementById('chips');box.innerHTML='';
+  palette.forEach((c,i)=>{
+    const hex=toHex(c);const el=document.createElement('div');el.className='chip';
+    el.innerHTML=`<div class="sw" style="background:${hex}"><input type="color" value="${hex}" data-i="${i}"></div>
+      <div><input class="hx-in" value="${hex}" data-hex="${i}" maxlength="7"><div class="lbl">Colour ${i+1}</div></div>
+      <button class="x" data-rm="${i}" title="Remove">×</button>`;
+    box.appendChild(el);
+  });
+  if(palette.length<10){const add=document.createElement('div');add.className='chip addchip';add.id='addChip';add.textContent='+ Add';box.appendChild(add);}
+  box.querySelectorAll('input[type=color]').forEach(inp=>inp.oninput=e=>{palette[+e.target.dataset.i]=parseColor(e.target.value);render();});
+  box.querySelectorAll('.hx-in').forEach(inp=>inp.onchange=e=>{const p=parseColor(e.target.value);if(p)palette[+e.target.dataset.hex]=p;render();});
+  box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=e=>{const i=+e.target.dataset.rm;palette.splice(i,1);positions.splice(i,1);render();});
+  const ac=document.getElementById('addChip');if(ac)ac.onclick=()=>addColour([200,200,200]);
+}
+function addColour(c){if(palette.length>=10)return;palette.push(c);positions.push(null);render();}
+
+/* canvas */
+function renderCanvas(){
+  const cv=document.getElementById('canvas');
+  cv.querySelectorAll('.disc').forEach(d=>d.remove());
+  const W=cv.clientWidth||900,H=cv.clientHeight||300,r=96;
+  palette.forEach((c,i)=>{
+    if(!positions[i]){const cols=Math.max(1,Math.floor((W-20)/(r+18)));positions[i]={x:20+(i%cols)*(r+18),y:24+Math.floor(i/cols)*(r+18)};}
+    positions[i].x=clamp(positions[i].x,4,W-r-4);positions[i].y=clamp(positions[i].y,4,H-r-4);
+    const d=document.createElement('div');d.className='disc';d.style.background=toHex(c);
+    d.style.left=positions[i].x+'px';d.style.top=positions[i].y+'px';d.dataset.i=i;
+    d.innerHTML=`<span class="dt">${toHex(c)}</span>`;
+    dragify(d,i,cv);cv.appendChild(d);
+  });
+  document.getElementById('ord').textContent=palette.length?'Order: '+palette.map(toHex).join('  ›  '):'Add colours to arrange';
+}
+function dragify(d,i,cv){
+  d.onpointerdown=e=>{
+    e.preventDefault();d.setPointerCapture(e.pointerId);
+    const r=d.getBoundingClientRect(),cb=cv.getBoundingClientRect();
+    const ox=e.clientX-r.left,oy=e.clientY-r.top;
+    const move=ev=>{positions[i].x=ev.clientX-cb.left-ox;positions[i].y=ev.clientY-cb.top-oy;
+      positions[i].x=clamp(positions[i].x,4,cv.clientWidth-100);positions[i].y=clamp(positions[i].y,4,cv.clientHeight-100);
+      d.style.left=positions[i].x+'px';d.style.top=positions[i].y+'px';};
+    const up=()=>{d.releasePointerCapture(e.pointerId);d.onpointermove=null;d.onpointerup=null;reorderByX();};
+    d.onpointermove=move;d.onpointerup=up;
+  };
+}
+function reorderByX(){
+  const idx=palette.map((_,i)=>i).sort((a,b)=>positions[a].x-positions[b].x);
+  palette=idx.map(i=>palette[i]);positions=idx.map(i=>positions[i]);
+  render();
+}
+
+/* roles */
+function renderRoles(){
+  const box=document.getElementById('roles');box.innerHTML='';
+  const R=roles();if(!R){box.innerHTML='<span class="hint">Add colours to see roles.</span>';return;}
+  ROLE_KEYS.forEach(k=>{
+    const c=R[k];const el=document.createElement('div');el.className='role';el.dataset.k=k;
+    el.innerHTML=`<div class="rsw" style="background:${toHex(c)}"></div><div><div class="rl">${ROLE_LABELS[k]}</div><div class="rh">${toHex(c)}</div></div>`;
+    el.onclick=ev=>{ev.stopPropagation();openRolePop(el,k);};
+    box.appendChild(el);
+  });
+}
+function openRolePop(anchor,k){
+  closePops();
+  const pop=document.createElement('div');pop.className='pop';
+  palette.forEach(c=>{const s=document.createElement('div');s.className='ps';s.style.background=toHex(c);
+    s.onclick=ev=>{ev.stopPropagation();roleOverrides[k]=toHex(c);closePops();render();};pop.appendChild(s);});
+  anchor.appendChild(pop);
+}
+function closePops(){document.querySelectorAll('.pop').forEach(p=>p.remove());}
+document.addEventListener('click',closePops);
+
+/* vision selector */
+function renderVision(){
+  const box=document.getElementById('vision');
+  box.innerHTML=VIS.map(v=>`<button class="vpill${v[0]===vision?' on':''}" data-v="${v[0]}">${v[1]}</button>`).join('');
+  box.querySelectorAll('.vpill').forEach(b=>b.onclick=()=>{vision=b.dataset.v;renderVision();renderMockups();});
+  document.getElementById('visexp').textContent=VIS.find(x=>x[0]===vision)[2];
+}
+
+/* mockups */
+const MOCK=[
+  {fn:mockHero,name:'Marketing site',info:'Headline legibility, primary CTA prominence, and the accent against a full-bleed background.'},
+  {fn:mockApp,name:'Mobile player',info:'Small controls and a progress bar on a tinted surface — touch-target and icon contrast.'},
+  {fn:mockDash,name:'Dashboard',info:'Chart bars and KPI figures where colour carries meaning — watch 1.4.1 (never colour alone).'},
+  {fn:mockPricing,name:'Pricing card',info:'Conversion CTA contrast and tick legibility on a raised surface card.'}
+];
+function renderMockups(){
+  const box=document.getElementById('mkgrid');const R=simRoles();
+  if(!R){box.innerHTML='<span class="hint">Add at least two colours.</span>';return;}
+  box.innerHTML=MOCK.map(m=>`<div class="mkitem">${m.fn(R)}<div class="mkcap"><b>${m.name}.</b> ${m.info}</div></div>`).join('');
+}
+function mockHero(R){const{background:bg,surface:sf,text:tx,primary:pr,accent:ac}=R;
+  return `<div class="mk" style="background:${toHex(bg)};color:${toHex(tx)}">
+    <div class="mk-nav"><span>◐ Studio</span><span style="color:${rgba(tx,.6)}">Work · About · Contact</span>
+      <span class="mk-btn" style="background:${toHex(pr)};color:${onColor(pr)}">Get started</span></div>
+    <h3>Design that <span style="color:${toHex(pr)}">moves</span> people.</h3>
+    <p style="color:${rgba(tx,.62)}">A studio building brands with clarity, contrast and intent.</p>
+    <div class="mk-cta"><span class="mk-btn" style="background:${toHex(pr)};color:${onColor(pr)};padding:11px 20px">Start a project</span>
+      <span class="mk-btn" style="border:1.5px solid ${rgba(tx,.32)};color:${toHex(tx)};padding:11px 20px">View work →</span></div>
+    <div class="mk-card" style="background:${toHex(sf)};color:${tx===sf?onColor(sf):toHex(tx)};border:1px solid ${rgba(tx,.08)}">
+      <span style="width:34px;height:34px;border-radius:9px;background:${toHex(ac)}"></span>
+      <b>Accent in context</b><small style="color:${rgba(tx,.6)}">Surface card over background.</small></div>
+  </div>`;}
+function mockApp(R){const{background:bg,surface:sf,text:tx,primary:pr,accent:ac}=R;
+  return `<div class="mk" style="background:${toHex(bg)};color:${toHex(tx)};display:flex;flex-direction:column">
+    <div class="mk-nav"><span>♪ Player</span><span style="color:${rgba(tx,.55)}">·  ·  ·</span></div>
+    <div class="ph-art" style="background:linear-gradient(135deg,${toHex(pr)},${toHex(ac)})"></div>
+    <b style="font-size:18px">Variable Weights</b>
+    <small style="color:${rgba(tx,.6)};font-size:13px">Outfit · single 04:12</small>
+    <div class="ph-bar" style="background:${rgba(tx,.16)}"><i style="background:${toHex(pr)};width:58%"></i></div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:22px;margin-top:auto">
+      <span style="color:${rgba(tx,.6)};font-size:18px">↺</span>
+      <span style="width:52px;height:52px;border-radius:50%;background:${toHex(pr)};color:${onColor(pr)};display:flex;align-items:center;justify-content:center;font-size:20px">►</span>
+      <span style="color:${toHex(ac)};font-size:18px;font-weight:800">♥</span></div>
+  </div>`;}
+function mockDash(R){const{background:bg,surface:sf,text:tx,primary:pr,accent:ac}=R;
+  const bars=[42,68,55,80,38,72,60];
+  return `<div class="mk" style="background:${toHex(bg)};color:${toHex(tx)}">
+    <div class="mk-nav"><b style="font-size:15px">Overview</b><span style="color:${rgba(tx,.55)}">This week</span></div>
+    <div style="display:flex;gap:12px;margin-bottom:6px">
+      <div class="stat" style="background:${toHex(sf)};flex:1;border:1px solid ${rgba(tx,.07)}"><div style="font-size:11px;color:${rgba(tx,.6)};font-weight:600">Revenue</div><div style="font-size:24px;font-weight:800">£48.2k</div><div style="font-size:11px;color:${toHex(pr)};font-weight:700">▲ 12%</div></div>
+      <div class="stat" style="background:${toHex(sf)};flex:1;border:1px solid ${rgba(tx,.07)}"><div style="font-size:11px;color:${rgba(tx,.6)};font-weight:600">Users</div><div style="font-size:24px;font-weight:800">9,310</div><div style="font-size:11px;color:${toHex(ac)};font-weight:700">▲ 6%</div></div>
+    </div>
+    <div class="bars">${bars.map((h,i)=>`<i style="height:${h}%;background:${i===3?toHex(ac):toHex(pr)}"></i>`).join('')}</div>
+  </div>`;}
+function mockPricing(R){const{background:bg,surface:sf,text:tx,primary:pr,accent:ac}=R;
+  return `<div class="mk" style="background:${toHex(bg)};color:${toHex(tx)};display:flex;flex-direction:column;align-items:flex-start">
+    <div class="mk-btn" style="background:${rgba(ac,.18)};color:${toHex(ac)};font-size:11px">Most popular</div>
+    <h3 style="margin-top:14px">Pro</h3>
+    <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:16px"><span style="font-size:40px;font-weight:800">£24</span><span style="color:${rgba(tx,.6)};font-size:14px">/ month</span></div>
+    ${['Unlimited palettes','APCA + WCAG scoring','PDF & HTML export'].map(t=>`<div class="tick"><span style="background:${toHex(pr)};color:${onColor(pr)}">✓</span>${t}</div>`).join('')}
+    <span class="mk-btn" style="background:${toHex(pr)};color:${onColor(pr)};width:100%;text-align:center;padding:13px;margin-top:14px;font-size:14px">Choose Pro</span>
+  </div>`;}
+
+/* matrix */
+function txtColorFor(bg){return luminance(bg)>0.4?[20,20,18]:[251,250,246];}
+function renderMatrix(){
+  const t=document.getElementById('matrix');t.innerHTML='';
+  if(palette.length<2){t.innerHTML='<tr><td style="color:var(--soft);font-weight:500;padding:20px">Add at least two colours.</td></tr>';return;}
+  const head=document.createElement('tr');const cn=document.createElement('th');cn.className='corner';head.appendChild(cn);
+  palette.forEach(c=>{const th=document.createElement('th');const d=document.createElement('div');d.className='hsw';d.style.background=toHex(c);d.style.color=toHex(txtColorFor(c));d.innerHTML=`<span class="t">${toHex(c)}</span>`;th.appendChild(d);head.appendChild(th);});
+  t.appendChild(head);
+  palette.forEach((bg,ri)=>{
+    const tr=document.createElement('tr');const rh=document.createElement('th');const d=document.createElement('div');d.className='hsw row';d.style.background=toHex(bg);d.style.color=toHex(txtColorFor(bg));d.innerHTML=`<span class="t">${toHex(bg)}</span>`;rh.appendChild(d);tr.appendChild(rh);
+    palette.forEach((fg,ci)=>{
+      const td=document.createElement('td');
+      if(ri===ci){const c=document.createElement('div');c.className='cell diag';td.appendChild(c);tr.appendChild(td);return;}
+      const ev=evaluate(fg,bg);const cell=document.createElement('div');cell.className='cell';cell.style.background=toHex(bg);cell.style.color=toHex(fg);
+      cell.innerHTML=`<div class="samp">Ag</div><div class="foot"><span class="ratio">${ev.ratio.toFixed(1)}</span>
+        <span class="dots">${ev.checks.map(c=>`<i style="background:${c.pass?'var(--pass)':'transparent'};border-color:${c.pass?'var(--pass)':'rgba(0,0,0,.22)'}"></i>`).join('')}</span></div>`;
+      cell.onclick=()=>openDetail(fg,bg);td.appendChild(cell);tr.appendChild(td);
+    });
+    t.appendChild(tr);
+  });
+}
+
+/* detail */
+function checksHTML(ev){return ev.checks.map(c=>`<div class="check"><span class="badge ${c.pass?'ok':'no'}">${c.pass?'✓':'✕'}</span><span>${c.label}</span><span class="v" style="color:${c.pass?'var(--pass)':'var(--fail)'}">${c.val}</span></div>`).join('');}
+function fontSamplesHTML(fg,bg){const fgx=toHex(fg),bgx=toHex(bg);
+  const rows=[['48 · 800',48,800],['32 · 700',32,700],['24 · 600',24,600],['18 · 600',18,600],['16 · 400',16,400],['14 · 400',14,400],['12 · 500',12,500]];
+  const block=(t,b)=>`<div class="fsample" style="background:${b};color:${t}">${rows.map(r=>`<div class="r"><span class="tag">${r[0]}</span><span style="font-size:${r[1]}px;font-weight:${r[2]};line-height:1.1">Type with intent</span></div>`).join('')}</div>`;
+  return `<div class="fonts"><h3>${fgx} on ${bgx}</h3>${block(fgx,bgx)}<h3>${bgx} on ${fgx}</h3>${block(bgx,fgx)}</div>`;}
+function cvdHTML(fg,bg){
+  const types=[['Normal','normal'],['Deuteranopia','deuteranopia'],['Protanopia','protanopia'],['Tritanopia','tritanopia']];
+  return `<div class="fonts"><h3>How colour-blind viewers see this pair</h3>
+    <div style="display:flex;gap:10px">${types.map(([lbl,t])=>{
+      const f=t==='normal'?fg:simulateCVD(fg,t),g=t==='normal'?bg:simulateCVD(bg,t);
+      const merge=colDist(f,g)<32;
+      return `<div style="flex:1;border-radius:11px;overflow:hidden;border:1px solid var(--line)">
+        <div style="background:${toHex(g)};color:${toHex(f)};padding:15px 13px;min-height:70px;display:flex;flex-direction:column;justify-content:space-between">
+          <span style="font-size:19px;font-weight:800">Ag</span><span style="font-size:10px;font-weight:700;opacity:.8">${lbl}</span></div>
+        <div style="font-size:10px;font-weight:700;padding:7px 10px;color:${merge?'var(--fail)':'var(--pass)'}">${merge?'⚠ colours merge':'✓ stays distinct'}</div>
+      </div>`;}).join('')}</div>
+    <p class="hint" style="margin-top:10px">Contrast survives most deficiencies, but hue cues vanish — never rely on colour alone (WCAG 1.4.1).</p></div>`;
+}
+function openDetail(fg,bg){const ev=evaluate(fg,bg),fgx=toHex(fg),bgx=toHex(bg);
+  document.getElementById('modal').innerHTML=`<button class="close" onclick="closeModal()">×</button>
+    <div class="kicker" style="margin-bottom:6px">Pair detail</div>
+    <div class="pairhead"><div class="half" style="background:${bgx};color:${fgx}"><span class="big">Ag</span><span class="sm">text ${fgx} · on ${bgx}</span></div>
+      <div class="half" style="background:${fgx};color:${bgx}"><span class="big">Ag</span><span class="sm">text ${bgx} · on ${fgx}</span></div></div>
+    <div class="scoreline"><span class="frac">${ev.score}/${ev.total}</span><span class="of">standards passing · ${ev.ratio.toFixed(2)}:1 · Lc ${ev.lc.toFixed(1)}</span></div>
+    <div class="checks">${checksHTML(ev)}</div>${cvdHTML(fg,bg)}${fontSamplesHTML(fg,bg)}`;
+  document.getElementById('overlay').classList.add('on');}
+function closeModal(){document.getElementById('overlay').classList.remove('on');}
+document.getElementById('overlay').onclick=e=>{if(e.target.id==='overlay')closeModal();};
+
+/* report */
+function pairs(){const out=[];for(let i=0;i<palette.length;i++)for(let j=i+1;j<palette.length;j++)out.push([palette[i],palette[j]]);return out;}
+function reportHTML(){
+  const date=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  const R=roles();
+  let swatches=palette.map((c,i)=>`<div style="flex:1;min-width:90px"><div style="height:78px;border-radius:10px;background:${toHex(c)};border:1px solid rgba(0,0,0,.07)"></div><div style="font-weight:700;font-size:13px;margin-top:8px">${toHex(c)}</div><div style="font-size:11px;color:#6B6A63">Colour ${i+1}</div></div>`).join('');
+  let mat='<table style="border-collapse:separate;border-spacing:5px"><tr><td style="width:46px"></td>';
+  palette.forEach(c=>{mat+=`<td style="text-align:center;font-size:10px;font-weight:700">${toHex(c)}</td>`;});mat+='</tr>';
+  palette.forEach(bg=>{mat+=`<tr><td style="font-size:10px;font-weight:700;text-align:right;padding-right:4px">${toHex(bg)}</td>`;
+    palette.forEach(fg=>{if(bg===fg){mat+=`<td><div style="width:72px;height:54px;border-radius:7px;background:repeating-linear-gradient(45deg,#E4E1D8 0 5px,#fff 5px 10px)"></div></td>`;return;}
+      const ev=evaluate(fg,bg);mat+=`<td><div style="width:72px;height:54px;border-radius:7px;background:${toHex(bg)};color:${toHex(fg)};padding:6px 7px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid rgba(0,0,0,.05)"><span style="font-size:15px;font-weight:700">Ag</span><span style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:10px">${ev.ratio.toFixed(1)}</b><b style="font-size:9px">${ev.score}/${ev.total}</b></span></div></td>`;});mat+='</tr>';});
+  mat+='</table>';
+  let cards='';
+  pairs().forEach(([a,b])=>{const ev=evaluate(a,b),sm=sizeMatrix(a,b);
+    cards+=`<div style="break-inside:avoid;border:1px solid #E4E1D8;border-radius:14px;padding:22px;margin-bottom:18px;background:#fff">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px"><div style="font-size:20px;font-weight:800">${toHex(a)} <span style="color:#B9B4A6">×</span> ${toHex(b)}</div><div style="font-size:22px;font-weight:800">${ev.score}/${ev.total}</div></div>
+      <div style="display:flex;gap:8px;margin-bottom:16px">${ev.checks.map(c=>`<div style="flex:1;text-align:center;padding:8px 4px;border-radius:8px;background:${c.pass?'#EAF3EC':'#FBEAE6'};color:${c.pass?'#3F7A4F':'#C0492F'}"><div style="font-size:15px;font-weight:800">${c.pass?'✓':'✕'}</div><div style="font-size:10px;font-weight:700;margin-top:2px">${c.key}</div><div style="font-size:9px;opacity:.8">${c.val}</div></div>`).join('')}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px"><tr style="color:#6B6A63;text-align:left"><th style="font-weight:600;padding:4px 0">Context</th><th style="font-weight:600;text-align:center">AA</th><th style="font-weight:600;text-align:center">AAA</th><th style="font-weight:600;text-align:center">APCA</th></tr>
+      ${sm.map(s=>`<tr style="border-top:1px solid #EFEDE6"><td style="padding:5px 0;font-weight:600">${s.t}</td><td style="text-align:center;color:${s.aa?'#3F7A4F':'#C0492F'};font-weight:700">${s.aa?'pass':'fail'}</td><td style="text-align:center;color:${s.aaa?'#3F7A4F':'#C0492F'};font-weight:700">${s.aaa?'pass':'fail'}</td><td style="text-align:center;color:${s.apca?'#3F7A4F':'#C0492F'};font-weight:700">${s.apca?'pass':'fail'}</td></tr>`).join('')}</table>
+      <div style="display:flex;gap:10px">${[[a,b],[b,a]].map(([t,g])=>`<div style="flex:1;border-radius:10px;padding:14px;background:${toHex(g)};color:${toHex(t)};border:1px solid rgba(0,0,0,.06)"><div style="font-size:9px;font-weight:700;opacity:.6;letter-spacing:.06em;margin-bottom:8px">${toHex(t)} ON ${toHex(g)}</div><div style="font-size:26px;font-weight:800;line-height:1">Type</div><div style="font-size:16px;font-weight:600;margin:5px 0 3px">Headline sample</div><div style="font-size:13px;font-weight:400">Body copy at fourteen pixels.</div><div style="font-size:11px;font-weight:400;opacity:.95">Caption at eleven pixels.</div></div>`).join('')}</div>
+    </div>`;});
+  const heroPreview=R?`<div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#6B6A63;margin-bottom:14px">Mockup preview</div>
+    <div style="border-radius:16px;overflow:hidden;border:1px solid #E4E1D8;margin-bottom:38px;background:${toHex(R.background)};color:${toHex(R.text)};padding:30px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;font-size:13px;font-weight:600"><span>◐ Studio</span><span class="mk-btn" style="background:${toHex(R.primary)};color:${onColor(R.primary)};font-size:12px;font-weight:700;padding:8px 15px;border-radius:999px">Get started</span></div>
+      <div style="font-size:34px;font-weight:800;letter-spacing:-.02em;margin-bottom:8px">Design that <span style="color:${toHex(R.primary)}">moves</span> people.</div>
+      <div style="color:${rgba(R.text,.62)};font-size:15px;margin-bottom:18px">A studio building brands with clarity and contrast.</div>
+      <span style="background:${toHex(R.primary)};color:${onColor(R.primary)};font-size:13px;font-weight:700;padding:11px 20px;border-radius:999px">Start a project</span>
+      <span style="border:1.5px solid ${rgba(R.text,.3)};color:${toHex(R.text)};font-size:13px;font-weight:700;padding:11px 20px;border-radius:999px;margin-left:10px">View work →</span>
+    </div>`:'';
+  return `<div style="font-family:'Outfit',sans-serif;color:#1A1A18;background:#FBFAF6;padding:46px 44px;width:820px">
+    <div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#6B6A63">Contrast report · ${date}</div>
+    <div style="font-size:62px;font-weight:800;letter-spacing:-.05em;line-height:.82;margin:8px 0 28px;text-transform:lowercase">colour<br>contrast.</div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#6B6A63;margin-bottom:14px">Palette · ${palette.length} colours</div>
+    <div style="display:flex;gap:12px;margin-bottom:38px">${swatches}</div>
+    ${heroPreview}
+    <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#6B6A63;margin-bottom:14px">Matrix · score / 4 standards</div>
+    <div style="margin-bottom:40px">${mat}</div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#6B6A63;margin-bottom:14px">Pair comparisons</div>${cards}
+    <div style="margin-top:30px;padding-top:18px;border-top:1px solid #E4E1D8;display:flex;align-items:flex-end;gap:12px"><span style="font-size:11px;color:#9A958A;padding-bottom:5px">AA/AAA per WCAG 2.1 · Non-text 1.4.11 · APCA (WCAG 3 draft) · made by</span><span style="font-size:26px;font-weight:800;letter-spacing:-.05em;line-height:.8;color:#1A1A18;text-transform:lowercase;font-family:'Outfit',sans-serif">any&nbsp;key</span></div>
+  </div>`;
+}
+function exportHTML(){
+  if(palette.length<2)return alert('Add at least two colours.');
+  const doc=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Contrast report</title><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>body{margin:0;background:#FBFAF6}*{box-sizing:border-box}</style></head><body>${reportHTML()}</body></html>`;
+  const blob=new Blob([doc],{type:'text/html'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='contrast-report.html';a.click();URL.revokeObjectURL(url);
+}
+async function exportPDF(){
+  if(palette.length<2)return alert('Add at least two colours.');
+  const stage=document.getElementById('reportStage');stage.innerHTML=reportHTML();
+  const node=stage.firstElementChild;await new Promise(r=>setTimeout(r,280));
+  const canvas=await html2canvas(node,{scale:2,backgroundColor:'#FBFAF6',useCORS:true});
+  const {jsPDF}=window.jspdf;const pdf=new jsPDF('p','mm','a4');const pw=210,ph=297;
+  const imgW=pw,imgH=canvas.height*pw/canvas.width,img=canvas.toDataURL('image/jpeg',0.94);
+  let heightLeft=imgH,pos=0;pdf.addImage(img,'JPEG',0,pos,imgW,imgH);heightLeft-=ph;
+  while(heightLeft>0){pos=heightLeft-imgH;pdf.addPage();pdf.addImage(img,'JPEG',0,pos,imgW,imgH);heightLeft-=ph;}
+  pdf.save('contrast-report.pdf');stage.innerHTML='';
+}
+
+/* pick methods */
+async function eyedrop(){
+  if(!window.EyeDropper)return alert('Eyedropper needs Chrome or Edge. Use Paste a colour instead.');
+  try{const ed=new EyeDropper();const r=await ed.open();const c=parseColor(r.sRGBHex);if(c)addColour(c);}catch(e){}
+}
+async function pasteColour(){
+  try{const t=await navigator.clipboard.readText();const c=parseColor(t);if(c)addColour(c);else alert('Clipboard has no hex/rgb colour. Copy something like #3A7BD5 first.');}
+  catch(e){alert('Clipboard blocked by the browser — paste into the box above instead.');}
+}
+function randomColour(){addColour([Math.random()*255|0,Math.random()*255|0,Math.random()*255|0]);}
+
+/* wiring */
+function loadFromText(){
+  const raw=document.getElementById('paste').value;
+  const tokens=raw.split(/[\n,;]+|\s+/).map(s=>s.trim()).filter(Boolean);const out=[];
+  for(const tk of tokens){const c=parseColor(tk);if(c)out.push(c);if(out.length>=10)break;}
+  if(out.length){palette=out;positions=out.map(()=>null);roleOverrides={};render();}else alert('No valid colours found. Use hex or rgb().');
+}
+document.getElementById('loadBtn').onclick=loadFromText;
+document.getElementById('dropBtn').onclick=eyedrop;
+document.getElementById('clipBtn').onclick=pasteColour;
+document.getElementById('randBtn').onclick=randomColour;
+document.getElementById('shuffleBtn').onclick=()=>{const v=Object.values(roles());const keys=ROLE_KEYS;const rot=keys.map((k,i)=>[k,v[(i+1)%v.length]]);rot.forEach(([k,c])=>roleOverrides[k]=toHex(c));render();};
+document.getElementById('htmlBtn').onclick=exportHTML;
+document.getElementById('pdfBtn').onclick=exportPDF;
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+window.addEventListener('resize',()=>renderCanvas());
+
+palette=DEFAULT.map(parseColor);positions=palette.map(()=>null);
+document.getElementById('paste').value=DEFAULT.join('\n');
+render();
+</script>
+</body>
+</html>
