@@ -1,0 +1,17 @@
+{
+  "name": "Contrast — Colour Accessibility",
+  "id": "contrast-colour-accessibility-checker",
+  "api": "1.0.0",
+  "editorType": ["figma", "figjam"],
+  "main": "code.js",
+  "ui": "ui.html",
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": [
+      "https://fonts.googleapis.com",
+      "https://fonts.gstatic.com",
+      "https://cdnjs.cloudflare.com"
+    ],
+    "reasoning": "Loads the Outfit webfont and the jsPDF / html2canvas libraries used by the report exporter."
+  }
+}

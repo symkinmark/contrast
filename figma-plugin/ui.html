@@ -258,6 +258,10 @@
     </div>
     <button class="btn" id="loadBtn">load palette →</button>
   </div>
+  <div class="pickrow" id="figmaRow">
+    <button class="btn" id="pullBtn">⊞ pull from selection</button>
+    <button class="btn ghost sm" id="pushBtn">⊞ send palette to figma</button>
+  </div>
   <div class="pickrow">
     <button class="btn ghost sm" id="dropBtn">⛏ eyedropper</button>
     <button class="btn ghost sm" id="clipBtn">⧉ paste a colour</button>
@@ -831,6 +835,16 @@ renderSanzo();
 palette=DEFAULT.map(parseColor);positions=palette.map(()=>null);shapes=palette.map(()=>'circle');
 document.getElementById('paste').value=DEFAULT.join('\n');
 render();
+</script>
+<script>
+/* Figma plugin bridge */
+(function(){
+  var pull=document.getElementById("pullBtn"),push=document.getElementById("pushBtn");
+  if(pull)pull.onclick=function(){parent.postMessage({pluginMessage:{type:"pull"}},"*");};
+  if(push)push.onclick=function(){try{if(palette&&palette.length)parent.postMessage({pluginMessage:{type:"push",colors:palette.map(toHex)}},"*");}catch(e){}};
+  window.onmessage=function(e){var m=e.data&&e.data.pluginMessage;if(!m)return;
+    if(m.type==="colors"&&m.colors&&m.colors.length){try{loadCombo(m.colors);}catch(e){}}};
+})();
 </script>
 </body>
 </html>
