@@ -11,19 +11,37 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{
-    --paper:#FBFAF6; --ink:#1A1A18; --soft:#6B6A63;
-    --line:#E4E1D8; --line2:#D6D2C6; --card:#FFFFFF;
+    --paper:#F2F1EC; --ink:#100F0E; --soft:#8A887E;
+    --line:#E0DDD3; --line2:#CCC8BB; --card:#FFFFFF;
     --pass:#3F7A4F; --fail:#C0492F; --radius:14px;
+    --pad:clamp(22px,5vw,72px);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;scroll-behavior:smooth}
   body{font-family:'Outfit',system-ui,sans-serif;background:var(--paper);color:var(--ink);
-    line-height:1.3;padding:48px 40px 110px;max-width:1180px;margin:0 auto;}
-  .kicker{font-size:13px;font-weight:500;letter-spacing:0;text-transform:lowercase;color:var(--soft);margin-bottom:14px}
-  h1{font-size:clamp(56px,13vw,140px);font-weight:800;letter-spacing:-.055em;line-height:.82;margin-bottom:24px;text-transform:lowercase}
+    line-height:1.25;padding:0 var(--pad) 140px;max-width:1320px;margin:0 auto;}
+
+  /* nav */
+  .topnav{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;
+    padding:20px 0 16px;margin-bottom:clamp(36px,7vw,84px);background:var(--paper);border-bottom:1px solid transparent}
+  .brandmark{font-size:34px;font-weight:800;letter-spacing:-.05em;color:var(--ink);text-decoration:none;line-height:1}
+  .navlinks{display:flex;gap:clamp(16px,3vw,48px)}
+  .navlinks a{font-size:15px;font-weight:500;color:var(--soft);text-decoration:none;text-transform:lowercase;transition:color .15s}
+  .navlinks a:hover{color:var(--ink)}
+
+  /* hero */
+  header#top{margin-bottom:clamp(72px,12vw,160px);scroll-margin-top:90px}
+  h1{font-size:clamp(64px,16vw,196px);font-weight:800;letter-spacing:-.062em;line-height:.78;margin-bottom:30px;text-transform:lowercase}
   h1 .dim{color:var(--line2)}
-  h2{font-size:clamp(22px,3.4vw,32px);font-weight:700;letter-spacing:-.035em;line-height:.98;color:var(--ink);margin-bottom:20px;text-transform:lowercase}
-  section{margin-bottom:60px}
+  .lead{font-size:clamp(20px,2.5vw,32px);font-weight:500;letter-spacing:-.02em;line-height:1.16;max-width:17em;text-transform:lowercase}
+  .lead .fade{color:var(--line2)}
+
+  /* sections */
+  section{margin-bottom:clamp(76px,12vw,150px);scroll-margin-top:88px}
+  .sechead{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:36px}
+  h2{font-size:clamp(40px,8.5vw,112px);font-weight:800;letter-spacing:-.058em;line-height:.82;color:var(--ink);text-transform:lowercase}
+  h2 .num{font-size:.18em;font-weight:600;color:var(--soft);vertical-align:1.1em;margin-right:.4em;letter-spacing:0}
+  .secsub{font-size:15px;font-weight:500;color:var(--soft);margin-top:16px;text-transform:lowercase;max-width:36em;line-height:1.4}
 
   .inrow{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
   textarea{font-family:'Outfit',sans-serif;font-size:15px;font-weight:500;width:340px;height:118px;resize:vertical;
@@ -158,40 +176,47 @@
 </head>
 <body>
 
-<header>
-  <div class="kicker">Accessibility · WCAG 2.1 + APCA · Live mockups</div>
-  <h1>Colour<br><span class="dim">contrast.</span></h1>
+<nav class="topnav">
+  <a class="brandmark" href="#top">a</a>
+  <div class="navlinks">
+    <a href="#inputSec">build</a>
+    <a href="#canvasSec">arrange</a>
+    <a href="#mockSec">preview</a>
+    <a href="#matrixSec">matrix</a>
+  </div>
+</nav>
+
+<header id="top">
+  <h1>colour<br><span class="dim">contrast.</span></h1>
+  <p class="lead">a studio-grade contrast checker — wcag aa, aaa, non-text and apca scored across your whole palette, <span class="fade">previewed on real interfaces and simulated for colour blindness.</span></p>
 </header>
 
 <section id="inputSec">
-  <h2>Build your palette</h2>
+  <div class="sechead"><div><h2><span class="num">01</span>build</h2><p class="secsub">paste, pick, or drag up to ten colours</p></div></div>
   <div class="inrow">
     <div>
       <textarea id="paste" placeholder="#1F2A44&#10;#E94F37&#10;rgb(106,141,115)&#10;…up to 10"></textarea>
       <div class="hint">Hex (#FFF / #FFFFFF) or rgb(). One per line, comma or space.</div>
     </div>
-    <button class="btn" id="loadBtn">Load palette →</button>
+    <button class="btn" id="loadBtn">load palette →</button>
   </div>
   <div class="pickrow">
-    <button class="btn ghost sm" id="dropBtn">⛏ Eyedropper</button>
-    <button class="btn ghost sm" id="clipBtn">⧉ Paste a colour</button>
-    <button class="btn ghost sm" id="randBtn">⤫ Random</button>
+    <button class="btn ghost sm" id="dropBtn">⛏ eyedropper</button>
+    <button class="btn ghost sm" id="clipBtn">⧉ paste a colour</button>
+    <button class="btn ghost sm" id="randBtn">⤫ random</button>
   </div>
   <div class="chips" id="chips"></div>
 </section>
 
 <section id="canvasSec">
-  <h2>Arrange — drag to reorder</h2>
+  <div class="sechead"><div><h2><span class="num">02</span>arrange</h2><p class="secsub">drag the discs — left-to-right order drives everything below</p></div></div>
   <div class="canvas" id="canvas"><div class="ord" id="ord"></div></div>
 </section>
 
 <section id="mockSec">
-  <div class="toolbar">
-    <div>
-      <h2 style="margin-bottom:12px">Live mockups</h2>
-      <div class="legend"><span>Click a role to reassign · updates every preview instantly</span></div>
-    </div>
-    <button class="btn ghost sm" id="shuffleBtn">↻ Shuffle roles</button>
+  <div class="sechead">
+    <div><h2><span class="num">03</span>preview</h2><p class="secsub">your palette on real ui — click any role to reassign it</p></div>
+    <button class="btn ghost sm" id="shuffleBtn">↻ shuffle roles</button>
   </div>
   <div class="roles" id="roles"></div>
   <div class="vision" id="vision"></div>
@@ -200,20 +225,17 @@
 </section>
 
 <section id="matrixSec">
-  <div class="toolbar">
-    <div>
-      <h2 style="margin-bottom:12px">Contrast matrix</h2>
-      <div class="legend">
-        <span><span class="dot" style="background:var(--pass)"></span>pass</span>
-        <span><span class="dot" style="background:var(--fail)"></span>fail</span>
-        <span>4 dots = AA · AAA · Non-text · APCA</span>
-        <span>row = bg · column = text</span>
-      </div>
-    </div>
+  <div class="sechead">
+    <div><h2><span class="num">04</span>matrix</h2><p class="secsub">every pair scored x/4 · row = background · column = text</p></div>
     <div style="display:flex;gap:10px">
-      <button class="btn ghost sm" id="htmlBtn">Export HTML</button>
-      <button class="btn sm" id="pdfBtn">Export PDF</button>
+      <button class="btn ghost sm" id="htmlBtn">export html</button>
+      <button class="btn sm" id="pdfBtn">export pdf</button>
     </div>
+  </div>
+  <div class="legend" style="margin-bottom:24px">
+    <span><span class="dot" style="background:var(--pass)"></span>pass</span>
+    <span><span class="dot" style="background:var(--fail)"></span>fail</span>
+    <span>4 dots = AA · AAA · Non-text · APCA</span>
   </div>
   <div class="mwrap"><table class="matrix" id="matrix"></table></div>
 </section>
