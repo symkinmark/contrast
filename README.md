@@ -7,7 +7,8 @@ No build step. No dependencies to install. One `index.html`.
 ## Features
 
 - **Build a palette** — paste hex/rgb, edit live, eyedropper (Chrome/Edge), paste-a-colour, or random.
-- **Arrange** — drag colour discs around the canvas; left-to-right order drives everything.
+- **Sanzo Wada dictionary** — load any of 348 historical pairings from *A Dictionary of Colour Combinations* (data: mattdesl/dictionary-of-colour-combinations).
+- **Arrange** — drag colour tokens around a large canvas; left-to-right order drives everything. Double-tap a token to switch its shape (circle / cube / arrow / type), and add colours straight from the canvas.
 - **Live mockups** — Realtime-Colors-style. Roles (background / surface / text / primary / accent) auto-assign and apply to a marketing site, mobile player, dashboard, and pricing card. Click any role to reassign.
 - **Colour-blindness simulation** — view every mockup under Deuteranopia, Protanopia, or Tritanopia; each pair's detail shows whether the colours stay distinct.
 - **Full contrast matrix** — every pair scored X/4 across all four standards.

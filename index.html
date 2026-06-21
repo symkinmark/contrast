@@ -68,14 +68,34 @@
   .addchip:hover{border-color:var(--ink);color:var(--ink)}
 
   /* drag canvas */
-  .canvas{position:relative;height:300px;border:1.5px dashed var(--line2);border-radius:20px;
-    background:radial-gradient(circle at 20% 20%, rgba(0,0,0,.015), transparent 60%);overflow:hidden;touch-action:none}
-  .disc{position:absolute;width:96px;height:96px;border-radius:50%;cursor:grab;user-select:none;
-    box-shadow:0 6px 20px rgba(0,0,0,.14);border:2px solid rgba(255,255,255,.5);display:flex;align-items:flex-end;justify-content:center;
-    padding-bottom:10px;transition:box-shadow .15s, transform .05s}
-  .disc:active{cursor:grabbing;box-shadow:0 14px 36px rgba(0,0,0,.26);z-index:30}
-  .disc .dt{font-size:11px;font-weight:800;letter-spacing:.02em;background:rgba(255,255,255,.82);color:#111;padding:2px 7px;border-radius:6px}
-  .canvas .ord{position:absolute;left:16px;bottom:14px;font-size:12px;font-weight:600;color:var(--soft)}
+  .canvas{position:relative;height:clamp(420px,52vh,580px);border:1.5px dashed var(--line2);border-radius:22px;
+    background:radial-gradient(circle at 18% 16%, rgba(0,0,0,.018), transparent 62%);overflow:hidden;touch-action:none}
+  .tok{position:absolute;width:116px;height:116px;cursor:grab;user-select:none;display:flex;align-items:center;justify-content:center;touch-action:none}
+  .tok:active{cursor:grabbing;z-index:30}
+  .tok .shape{filter:drop-shadow(0 7px 18px rgba(0,0,0,.18))}
+  .tok .circ{width:98px;height:98px;border-radius:50%;border:2px solid rgba(255,255,255,.5)}
+  .tok .tile{width:94px;height:94px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:800;letter-spacing:-.02em}
+  .tok .dt{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:800;letter-spacing:.02em;background:rgba(255,255,255,.88);color:#111;padding:2px 7px;border-radius:6px;white-space:nowrap;pointer-events:none}
+  .addblock{position:absolute;width:116px;height:116px;border:2px dashed var(--line2);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;background:rgba(255,255,255,.4);color:var(--soft);transition:.12s}
+  .addblock span{font-size:38px;font-weight:300;line-height:.7}
+  .addblock small{font-size:11px;font-weight:600;text-transform:lowercase}
+  .addblock:hover{border-color:var(--ink);color:var(--ink);background:rgba(255,255,255,.8)}
+  .shapepop{position:absolute;z-index:50;background:#fff;border:1.5px solid var(--line2);border-radius:13px;padding:7px;display:flex;gap:6px;box-shadow:0 16px 38px rgba(0,0,0,.2)}
+  .shapepop button{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:var(--ink);font-size:18px;font-weight:700;font-family:'Outfit'}
+  .shapepop button small{font-size:8px;font-weight:600;color:var(--soft);text-transform:lowercase}
+  .shapepop button.on{outline:2px solid var(--ink);outline-offset:-1px}
+  .canvas .ord{position:absolute;left:18px;bottom:14px;font-size:12px;font-weight:600;color:var(--soft);text-transform:lowercase;pointer-events:none}
+
+  /* sanzo wada dictionary */
+  .sanzo{margin-top:42px}
+  .sanzohead{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap}
+  .sanzohead .secsub{margin-top:0}
+  .sanzohead em{font-style:italic;color:var(--ink)}
+  .sanzostrip{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px;margin-top:18px;scrollbar-width:thin}
+  .combo{flex:0 0 auto;width:80px;height:96px;border-radius:12px;overflow:hidden;border:1px solid var(--line);cursor:pointer;display:flex;flex-direction:column;padding:0;background:none;position:relative;transition:transform .08s}
+  .combo:hover{transform:translateY(-3px)}
+  .combo .band{flex:1;width:100%;display:block}
+  .combo .cn{position:absolute;bottom:6px;left:6px;font-size:10px;font-weight:700;background:rgba(255,255,255,.86);color:#111;padding:1px 5px;border-radius:5px}
 
   .legend{display:flex;gap:26px;flex-wrap:wrap;align-items:center;font-size:13px;font-weight:500;color:var(--soft)}
   .legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle}
@@ -206,6 +226,13 @@
     <button class="btn ghost sm" id="randBtn">⤫ random</button>
   </div>
   <div class="chips" id="chips"></div>
+  <div class="sanzo">
+    <div class="sanzohead">
+      <span class="secsub">or load one of 348 historical pairings from sanzo wada's <em>dictionary of colour combinations</em></span>
+      <button class="btn ghost sm" id="sanzoRand">↻ random pairing</button>
+    </div>
+    <div class="sanzostrip" id="sanzostrip"></div>
+  </div>
 </section>
 
 <section id="canvasSec">
@@ -303,7 +330,10 @@ function sizeMatrix(fg,bg){const r=wcagRatio(fg,bg),lc=Math.abs(apca(fg,bg));
 /* ---------- state ---------- */
 let palette=[];
 let positions=[];          // {x,y} parallel to palette, for canvas
+let shapes=[];             // token shape parallel to palette: circle|cube|arrow|type
 let roleOverrides={};       // role -> hex
+/* Sanzo Wada — A Dictionary of Colour Combinations (mattdesl/dictionary-of-colour-combinations), 348 pairings */
+const SANZO=/*SANZO_DATA*/[["#D96629","#0093A5"],["#F99D1B","#12354E"],["#BB7125","#FFEFAE"],["#C5A56E","#59256A"],["#437742","#064F6E"],["#F48067","#051230"],["#F37420","#B4CDC2"],["#C27544","#B5B1D8"],["#642D5E","#80719E"],["#C27544","#8B835B"],["#EBD3A2","#A2B0AD"],["#C5A56E","#099197"],["#BB7125","#8C4C62"],["#F27291","#FBE6A0"],["#00978D","#B5B1D8"],["#82241F","#A7D4E4"],["#DA525D","#00B49B"],["#D1B0A7","#4E1D4C"],["#653514","#87C540"],["#78CDD0","#CA92A8"],["#F48067","#00B49B"],["#FFF200","#1C4286"],["#FDC57E","#9A72AA"],["#644B1E","#8C4C62"],["#C55347","#BCE4E5"],["#F3A257","#71502F"],["#F8B6BA","#34454C"],["#762C19","#051230"],["#84875E","#97ACC8"],["#AB2439","#A2B0AD"],["#DD4027","#FFEFAE"],["#D8A37B","#87C540"],["#BB7125","#34454C"],["#F37F94","#B6BFC1"],["#B59392","#A62C37"],["#C19F2C","#B5DECC"],["#A84222","#59256A"],["#1A7444","#1C4286"],["#CC1236","#005B8D"],["#C56127","#B2B73E"],["#8B835B","#78CDD0"],["#E2B540","#4F4086"],["#F8B6BA","#A36AA5"],["#00908A","#5A82B3"],["#FDD4BD","#F8ED43"],["#F37420","#111314"],["#C55347","#C0A9B3"],["#B73F74","#005B8D"],["#A7D4E4","#006EB8"],["#EBD3A2","#4E1D4C"],["#A62C37","#006EB8"],["#F5ECC2","#111314"],["#F99D1B","#4E1D4C"],["#00978D","#A5C8D1"],["#D46D7A","#FFFFFF"],["#C0A9B3","#4F4086"],["#7A4456","#34454C"],["#793327","#00B49B"],["#F37F94","#B09F36"],["#FFEFAE","#12354E"],["#C7D14F","#501345"],["#FFF200","#111314"],["#6D4145","#0093A5"],["#A36AA5","#66629C"],["#C19F2C","#78CDD0"],["#D6B43E","#6B7140"],["#5A82B3","#12354E"],["#B59392","#FFF200"],["#A1A39A","#111314"],["#BB7125","#555832"],["#AB2439","#D8A37B"],["#F5ECC2","#A7D4E4"],["#71502F","#8FA071"],["#B5DECC","#099197"],["#A7D4E4","#40456A"],["#FFEFAE","#A1A39A"],["#DA525D","#064F6E"],["#EEB480","#62C6BF"],["#762C19","#099197"],["#F5ECC2","#9A72AA"],["#F3A257","#A1A39A"],["#793327","#4E1D4C"],["#C1C494","#40456A"],["#FDD4BD","#112F2C"],["#C56127","#007190"],["#BB7125","#00B49B"],["#F8B6BA","#B2B73E"],["#FDD4BD","#006EB8"],["#F99D1B","#40456A"],["#F37F94","#A36AA5"],["#6D4145","#C16B27"],["#F58E84","#00978D"],["#B09F36","#A5C8D1"],["#EBD3A2","#004F46"],["#793327","#1E0E3F"],["#E2B540","#837E31"],["#F8B6BA","#C55347"],["#762C19","#40456A"],["#FFEFAE","#0093A5"],["#96874D","#80719E"],["#E0B3B6","#1C4286"],["#EBD3A2","#C16B27"],["#C27544","#4E1D4C"],["#A62C37","#F5ECC2"],["#E0B3B6","#719470"],["#007190","#1E0E3F"],["#FFDD00","#848061"],["#F37F94","#A84222"],["#FFEFAE","#42533E"],["#7C4226","#4B3317"],["#FFEFAE","#AFD472"],["#F48067","#111314"],["#FDD4BD","#4B3317"],["#FCB315","#007190"],["#FBE6A0","#F15A30"],["#E0B3B6","#6450A1"],["#CC1236","#111314"],["#E2B540","#4B3317"],["#A5C8D1","#12354E"],["#E0B3B6","#AB2439"],["#7C4226","#D8A37B","#555832"],["#CC1236","#FDBF68","#00978D"],["#F58E84","#F8ED43","#7A4456"],["#802626","#E2B540","#A6A159"],["#D1B0A7","#0093A5","#40456A"],["#EBD3A2","#E2B540","#1C4286"],["#FDC57E","#648F7B","#66629C"],["#F8B6BA","#62C6BF","#9A72AA"],["#FFDD00","#BC892B","#97ACC8"],["#BB7125","#A62C37","#4F4086"],["#BB7125","#D96629","#00939B"],["#F5ECC2","#F3A257","#B09F36"],["#82241F","#B09F36","#00B49B"],["#F37F94","#9A72AA","#59256A"],["#F5ECC2","#437742","#97ACC8"],["#CB2F43","#009465","#59256A"],["#C55347","#FDC57E","#648F7B"],["#F3A257","#F8ED43","#62C6BF"],["#97ACC8","#051230","#B6BFC1"],["#F3A257","#007190","#34454C"],["#F37420","#AFD472","#12354E"],["#A94151","#C19F2C","#97ACC8"],["#006EB8","#B984AF","#A1A39A"],["#B73F74","#F37420","#111314"],["#7C4226","#B2B73E","#1E0E3F"],["#BC892B","#635A3A","#1A7444"],["#F27291","#82241F","#B5DECC"],["#D6B43E","#FCB315","#0093A5"],["#D6B43E","#F37420","#112F2C"],["#FDD4BD","#B2B73E","#B4CDC2"],["#F5ECC2","#F99D1B","#064F6E"],["#C55347","#793327","#A5C8D1"],["#F37F94","#FCB315","#B2B73E"],["#CC1236","#FFF200","#006EB8"],["#EB5324","#00978D","#051230"],["#D6B43E","#96D1AA","#4F4086"],["#7D133A","#D6B43E","#5A82B3"],["#F8ED43","#C27544","#87C540"],["#BC892B","#78CDD0","#B5B1D8"],["#C19F2C","#71502F","#547076"],["#7C4226","#EEB480","#005B8D"],["#D46D7A","#8FA071","#B984AF"],["#FFDD00","#B5DECC","#007190"],["#DD4027","#FCB315","#4F4086"],["#E0B3B6","#F27291","#6D4145"],["#F48067","#FBE6A0","#112F2C"],["#C2AE93","#A7D4E4","#064F6E"],["#F8ED43","#064F6E","#8C4C62"],["#F8B6BA","#FFEFAE","#A1A39A"],["#B73F74","#FCB315","#59256A"],["#802626","#F99D1B","#B4CDC2"],["#C27544","#007190","#59256A"],["#F8ED43","#762C19","#B5DECC"],["#F8B6BA","#C0A9B3","#7A4456"],["#EEB480","#C1C494","#6450A1"],["#F9C1CE","#FDD4BD","#78CDD0"],["#802626","#96874D","#B5B1D8"],["#EBD3A2","#A5C8D1","#099197"],["#DD4027","#F3A257","#1C4286"],["#FDC57E","#9A72AA","#B6BFC1"],["#A62C37","#4F4086","#501345"],["#BB7125","#4B3317","#051230"],["#70727C","#8C4C62","#59256A"],["#F27291","#EBD3A2","#848061"],["#B59392","#C55347","#FFEFAE"],["#793327","#D8A37B","#006EB8"],["#005B8D","#C0A9B3","#A36AA5"],["#8FA071","#97ACC8","#96D1AA"],["#F8ED43","#253122","#62C6BF"],["#EBD3A2","#D96629","#111314"],["#B59392","#E2B540","#006EB8"],["#FDBF68","#4B3317","#70727C"],["#F48067","#FBE6A0","#00908A"],["#EB5324","#FDD4BD","#5A82B3"],["#F27291","#FFEFAE","#B6BFC1"],["#B2B73E","#A7D4E4","#6450A1"],["#F37F94","#66629C","#B6BFC1"],["#AE5224","#FFDD00","#489B6E"],["#AB544D","#806E4B","#1C4286"],["#A62C37","#C1C494","#719470"],["#F48067","#837E31","#96D1AA"],["#B5DECC","#96D1AA","#34454C"],["#FFEFAE","#EEA78C","#555832"],["#B73F74","#C27544","#A5C8D1"],["#802626","#EEA78C","#4F4086"],["#F8B6BA","#F3A257","#C27544"],["#A36752","#B4CDC2","#111314"],["#F5ECC2","#099197","#007190"],["#EBD3A2","#F99D1B","#97ACC8"],["#FDC57E","#F8ED43","#555832"],["#F68C50","#A6A159","#051230"],["#AB2439","#986F2D","#97ACC8"],["#EEA78C","#FFDD00","#A7D4E4"],["#EBD3A2","#A36752","#4F4086"],["#FDBF68","#006EB8","#BF5892"],["#EB5324","#489B6E","#111314"],["#802626","#D8A37B","#1A7444"],["#005B8D","#B5B1D8","#70727C"],["#EB5324","#719470","#004F46"],["#B71F57","#D8A37B","#A36AA5"],["#A62C37","#B6BFC1","#111314"],["#E2B540","#F99D1B","#C16B27"],["#B59392","#D8A37B","#B5DECC"],["#F27291","#547076","#7A4456"],["#CC1236","#004F46","#704357"],["#6D4145","#FDBF68","#4F4086"],["#F9C1CE","#A5C8D1","#0093A5"],["#A62C37","#FFEFAE","#B6BFC1"],["#F3A257","#253122","#B6BFC1"],["#F48067","#B5DECC","#96D1AA"],["#E0B3B6","#793327","#5A82B3"],["#CC1236","#EEB480","#051230"],["#A62C37","#96874D","#40456A"],["#FDC57E","#71502F","#A7D4E4"],["#EBD3A2","#F99D1B","#C0A9B3"],["#BC892B","#1C4286","#84565B"],["#A62C37","#762C19","#97ACC8"],["#D8A37B","#501345","#A1A39A"],["#B59392","#CAB356","#B4CDC2"],["#F6917E","#FFF200","#0093A5"],["#DD4027","#FFEFAE","#C5A56E","#547076"],["#F37F94","#AE5224","#1A7444","#111314"],["#BB7125","#EBD3A2","#6B7140","#34454C"],["#B59392","#C56127","#6D7E77","#007190"],["#A62C37","#819238","#12354E","#34454C"],["#F8B6BA","#A84222","#F5ECC2","#FDC57E"],["#BB7125","#FFDD00","#00978D","#1C4286"],["#F37F94","#BC892B","#B5B1D8","#704357"],["#793327","#C2AE93","#D6B43E","#547076"],["#CAB356","#F15A30","#00B49B","#BCE4E5"],["#A72144","#FFF200","#1A7444","#34454C"],["#DA525D","#BB7125","#C19F2C","#099197"],["#F8ED43","#F68C50","#501345","#34454C"],["#F8B6BA","#F5ECC2","#837E31","#CA92A8"],["#BB7125","#CAB356","#78CDD0","#111314"],["#EEA78C","#F37420","#009465","#111314"],["#E31F26","#FCB315","#006EB8","#A36AA5"],["#802626","#EEB480","#837E31","#007190"],["#F8ED43","#099197","#005B8D","#A1A39A"],["#D46D7A","#EEA78C","#B4CDC2","#00B49B"],["#A72144","#FFEFAE","#78CDD0","#A1A39A"],["#DA525D","#EBD3A2","#B09F36","#437742"],["#AE5224","#EEB480","#B5DECC","#34454C"],["#F8B6BA","#DD4027","#B7C2A9","#0093A5"],["#D46D7A","#FFDD00","#A6A159","#1E0E3F"],["#E31F26","#EBD3A2","#8FA071","#00978D"],["#FDBF68","#F99D1B","#00978D","#006EB8"],["#B59392","#BB7125","#253122","#BCE4E5"],["#BB7125","#802626","#A36AA5","#111314"],["#DA525D","#F5ECC2","#6B7140","#437742"],["#B71F57","#96D1AA","#099197","#112F2C"],["#FFEFAE","#F37420","#B5DECC","#97ACC8"],["#F9C1CE","#7D133A","#A36752","#B6BFC1"],["#F15A30","#8B835B","#5A82B3","#9A72AA"],["#C55347","#C2AE93","#762C19","#7A4456"],["#F37F94","#FDD4BD","#AFD472","#111314"],["#F27291","#B73F74","#837E31","#1E0E3F"],["#FDBF68","#D6B43E","#437742","#004F46"],["#BB7125","#EEA78C","#C2AE93","#12354E"],["#DA525D","#555832","#CA92A8","#7A4456"],["#FFEFAE","#00978D","#96D1AA","#007190"],["#DA525D","#C59F6B","#96D1AA","#B984AF"],["#AB544D","#802626","#719470","#62C6BF"],["#E2625E","#FFDD00","#00B49B","#004F46"],["#B59392","#AE5224","#F15A30","#B5DECC"],["#AE5224","#FCB315","#00939B","#40456A"],["#F37F94","#CAB356","#A7D4E4","#78CDD0"],["#F99D1B","#644B1E","#7A4456","#111314"],["#F8ED43","#C7D14F","#40456A","#1E0E3F"],["#6D4145","#FFEFAE","#555832","#96D1AA"],["#C7D14F","#00B49B","#96D1AA","#78CDD0"],["#FFEFAE","#EEB480","#C5A56E","#C2AE93"],["#BB7125","#B5DECC","#709390","#489B6E"],["#F5ECC2","#FDBF68","#437742","#97ACC8"],["#FDBF68","#FFF200","#006EB8","#1E0E3F"],["#F5ECC2","#D8A37B","#71502F","#34454C"],["#AE5224","#F99D1B","#6B7140","#40456A"],["#BB7125","#F8ED43","#F15A30","#111314"],["#C53C69","#EEA78C","#819238","#007190"],["#F48067","#FDBF68","#B5DECC","#78CDD0"],["#E31F26","#EBD3A2","#8FA071","#A36AA5"],["#FDBF68","#C2AE93","#BCE4E5","#007190"],["#FBE6A0","#F15A30","#253122","#B6BFC1"],["#793327","#FDBF68","#8B835B","#00978D"],["#EEB480","#FFDD00","#B2B73E","#B5DECC"],["#F8ED43","#00978D","#009465","#BCE4E5"],["#CC1236","#B5B1D8","#A36AA5","#501345"],["#D1B0A7","#CB2F43","#D96629","#96D1AA"],["#F3A257","#F68C50","#40456A","#064F6E"],["#F5ECC2","#EEB480","#837E31","#253122"],["#AB2439","#FDBF68","#B7C2A9","#C7D14F"],["#AE5224","#F99D1B","#709390","#005B8D"],["#CC1236","#FFF200","#1A7444","#111314"],["#F37F94","#793327","#1C4286","#4E1D4C"],["#F48067","#F5ECC2","#F3A257","#BF5892"],["#82241F","#009465","#4F4086","#59256A"],["#FCC79B","#C2AE93","#F8ED43","#B5DECC"],["#806E4B","#42533E","#004F46","#112F2C"],["#BB7125","#FFDD00","#F99D1B","#437742"],["#F58E84","#F5ECC2","#819238","#A5C8D1"],["#B59392","#F5ECC2","#253122","#97ACC8"],["#E31F26","#A84222","#BF5892","#6450A1"],["#FDC57E","#B2B73E","#762C19","#111314"],["#AB2439","#5A82B3","#A36AA5","#B6BFC1"],["#DA525D","#FBE6A0","#E2B540","#112F2C"],["#F5ECC2","#F15A30","#AFD472","#87C540"],["#F37F94","#BB7125","#C2AE93","#C0A9B3"],["#A84222","#F68C50","#4B3317","#00908A"],["#FDBF68","#C0A9B3","#501345","#34454C"],["#C1C494","#BCE4E5","#97ACC8","#099197"],["#C53C69","#1E0E3F","#9A72AA","#4F4086"],["#F58E84","#CB2F43","#253122","#004F46"],["#AE5224","#F8ED43","#96D1AA","#006EB8"],["#FDD4BD","#837E31","#AFD472","#007190"],["#82241F","#F99D1B","#4F4086","#34454C"],["#F37F94","#793327","#FFEFAE","#42533E"],["#6D4145","#CA92A8","#713B4C","#111314"],["#A62C37","#FCB315","#004F46","#C0A9B3"],["#D8A37B","#D96629","#A5C8D1","#40456A"],["#F15A30","#00B49B","#B6BFC1","#111314"],["#F48067","#437742","#253122","#A5C8D1"],["#F8B6BA","#FDBF68","#986F2D","#253122"],["#AE5224","#EBD3A2","#635A3A","#064F6E"],["#FDC57E","#1C4286","#A36AA5","#111314"],["#793327","#BCE4E5","#62C6BF","#6450A1"],["#B73F74","#B5DECC","#C7D14F","#6D7E77"],["#A6A159","#00B49B","#005B8D","#B984AF"],["#C1C494","#437742","#253122","#501345"]];
 const DEFAULT=['#26323D','#E6492D','#F4C95D','#5E8C61','#E9E1D4'];
 const ROLE_KEYS=['background','surface','text','primary','accent'];
 const ROLE_LABELS={background:'Background',surface:'Surface',text:'Text',primary:'Primary',accent:'Accent'};
@@ -361,41 +391,79 @@ function renderChips(){
   if(palette.length<10){const add=document.createElement('div');add.className='chip addchip';add.id='addChip';add.textContent='+ Add';box.appendChild(add);}
   box.querySelectorAll('input[type=color]').forEach(inp=>inp.oninput=e=>{palette[+e.target.dataset.i]=parseColor(e.target.value);render();});
   box.querySelectorAll('.hx-in').forEach(inp=>inp.onchange=e=>{const p=parseColor(e.target.value);if(p)palette[+e.target.dataset.hex]=p;render();});
-  box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=e=>{const i=+e.target.dataset.rm;palette.splice(i,1);positions.splice(i,1);render();});
+  box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=e=>{const i=+e.target.dataset.rm;palette.splice(i,1);positions.splice(i,1);shapes.splice(i,1);render();});
   const ac=document.getElementById('addChip');if(ac)ac.onclick=()=>addColour([200,200,200]);
 }
-function addColour(c){if(palette.length>=10)return;palette.push(c);positions.push(null);render();}
+function addColour(c){if(palette.length>=10)return;palette.push(c);positions.push(null);shapes.push('circle');render();}
+function loadCombo(arr){palette=arr.map(parseColor).filter(Boolean);positions=palette.map(()=>null);shapes=palette.map(()=>'circle');roleOverrides={};render();}
+function renderSanzo(){
+  const strip=document.getElementById('sanzostrip');if(!strip)return;
+  strip.innerHTML=SANZO.map((c,i)=>`<button class="combo" data-k="${i}" title="combination ${i+1}">${c.map(h=>`<span class="band" style="background:${h}"></span>`).join('')}<span class="cn">${i+1}</span></button>`).join('');
+  strip.querySelectorAll('.combo').forEach(b=>b.onclick=()=>loadCombo(SANZO[+b.dataset.k]));
+}
 
 /* canvas */
+function shade(c,amt){return c.map(v=>clamp(amt>0?v+(255-v)*amt:v*(1+amt),0,255)|0);}
+function tokenInner(c,shape){
+  const hex=toHex(c);
+  if(shape==='cube'){const t=toHex(shade(c,.2)),m=hex,d=toHex(shade(c,-.24));
+    return `<svg class="shape" viewBox="0 0 100 104" width="94" height="98"><polygon points="50,4 90,27 50,50 10,27" fill="${t}"/><polygon points="10,27 50,50 50,98 10,75" fill="${d}"/><polygon points="90,27 50,50 50,98 90,75" fill="${m}"/></svg>`;}
+  if(shape==='arrow'){return `<svg class="shape" viewBox="0 0 100 100" width="96" height="96"><path d="M8,38 H56 V17 L95,50 56,83 V62 H8 Z" fill="${hex}"/></svg>`;}
+  if(shape==='type'){return `<div class="shape tile" style="background:${hex};color:${onColor(c)}">Ag</div>`;}
+  return `<div class="shape circ" style="background:${hex}"></div>`;
+}
 function renderCanvas(){
   const cv=document.getElementById('canvas');
-  cv.querySelectorAll('.disc').forEach(d=>d.remove());
-  const W=cv.clientWidth||900,H=cv.clientHeight||300,r=96;
+  cv.querySelectorAll('.tok,.addblock,.shapepop').forEach(d=>d.remove());
+  const W=cv.clientWidth||900,H=cv.clientHeight||480,sz=116;
   palette.forEach((c,i)=>{
-    if(!positions[i]){const cols=Math.max(1,Math.floor((W-20)/(r+18)));positions[i]={x:20+(i%cols)*(r+18),y:24+Math.floor(i/cols)*(r+18)};}
-    positions[i].x=clamp(positions[i].x,4,W-r-4);positions[i].y=clamp(positions[i].y,4,H-r-4);
-    const d=document.createElement('div');d.className='disc';d.style.background=toHex(c);
-    d.style.left=positions[i].x+'px';d.style.top=positions[i].y+'px';d.dataset.i=i;
-    d.innerHTML=`<span class="dt">${toHex(c)}</span>`;
-    dragify(d,i,cv);cv.appendChild(d);
+    if(shapes[i]==null)shapes[i]='circle';
+    if(!positions[i]){const cols=Math.max(1,Math.floor((W-24)/(sz+16)));positions[i]={x:20+(i%cols)*(sz+16),y:24+Math.floor(i/cols)*(sz+16)};}
+    positions[i].x=clamp(positions[i].x,4,W-sz-4);positions[i].y=clamp(positions[i].y,4,H-sz-4);
+    const t=document.createElement('div');t.className='tok '+shapes[i];
+    t.style.left=positions[i].x+'px';t.style.top=positions[i].y+'px';t.dataset.i=i;
+    t.innerHTML=tokenInner(c,shapes[i])+`<span class="dt">${toHex(c)}</span>`;
+    dragify(t,i,cv);
+    t.ondblclick=ev=>{ev.preventDefault();ev.stopPropagation();openShapePicker(cv,i);};
+    cv.appendChild(t);
   });
-  document.getElementById('ord').textContent=palette.length?'Order: '+palette.map(toHex).join('  ›  '):'Add colours to arrange';
+  if(palette.length<10){
+    const add=document.createElement('div');add.className='addblock';add.innerHTML='<span>+</span><small>add</small>';
+    add.style.right='22px';add.style.bottom='40px';
+    add.onclick=()=>addColour([200,200,200]);
+    cv.appendChild(add);
+  }
+  document.getElementById('ord').textContent=palette.length?'order  '+palette.map(toHex).join('  ›  '):'add colours to arrange';
+}
+const SHAPE_OPTS=[['circle','●','circle'],['cube','◧','cube'],['arrow','➜','arrow'],['type','A','type']];
+function openShapePicker(cv,i){
+  cv.querySelectorAll('.shapepop').forEach(p=>p.remove());
+  const pop=document.createElement('div');pop.className='shapepop';
+  SHAPE_OPTS.forEach(([s,glyph,lbl])=>{const b=document.createElement('button');if(shapes[i]===s)b.classList.add('on');
+    b.innerHTML=`${glyph}<small>${lbl}</small>`;
+    b.onclick=ev=>{ev.stopPropagation();shapes[i]=s;cv.querySelectorAll('.shapepop').forEach(p=>p.remove());renderCanvas();};
+    pop.appendChild(b);});
+  let y=positions[i].y-60;if(y<4)y=positions[i].y+122;
+  pop.style.left=clamp(positions[i].x,4,cv.clientWidth-216)+'px';pop.style.top=y+'px';
+  cv.appendChild(pop);
 }
 function dragify(d,i,cv){
   d.onpointerdown=e=>{
+    if(e.target.closest('.shapepop'))return;
+    cv.querySelectorAll('.shapepop').forEach(p=>p.remove());
     e.preventDefault();d.setPointerCapture(e.pointerId);
     const r=d.getBoundingClientRect(),cb=cv.getBoundingClientRect();
-    const ox=e.clientX-r.left,oy=e.clientY-r.top;
-    const move=ev=>{positions[i].x=ev.clientX-cb.left-ox;positions[i].y=ev.clientY-cb.top-oy;
-      positions[i].x=clamp(positions[i].x,4,cv.clientWidth-100);positions[i].y=clamp(positions[i].y,4,cv.clientHeight-100);
+    const ox=e.clientX-r.left,oy=e.clientY-r.top,sx=e.clientX,sy=e.clientY;let moved=false;
+    const move=ev=>{if(Math.abs(ev.clientX-sx)+Math.abs(ev.clientY-sy)>4)moved=true;
+      positions[i].x=clamp(ev.clientX-cb.left-ox,4,cv.clientWidth-116);positions[i].y=clamp(ev.clientY-cb.top-oy,4,cv.clientHeight-116);
       d.style.left=positions[i].x+'px';d.style.top=positions[i].y+'px';};
-    const up=()=>{d.releasePointerCapture(e.pointerId);d.onpointermove=null;d.onpointerup=null;reorderByX();};
+    const up=()=>{d.releasePointerCapture(e.pointerId);d.onpointermove=null;d.onpointerup=null;if(moved)reorderByX();};
     d.onpointermove=move;d.onpointerup=up;
   };
 }
 function reorderByX(){
   const idx=palette.map((_,i)=>i).sort((a,b)=>positions[a].x-positions[b].x);
-  palette=idx.map(i=>palette[i]);positions=idx.map(i=>positions[i]);
+  palette=idx.map(i=>palette[i]);positions=idx.map(i=>positions[i]);shapes=idx.map(i=>shapes[i]);
   render();
 }
 
@@ -610,7 +678,7 @@ function loadFromText(){
   const raw=document.getElementById('paste').value;
   const tokens=raw.split(/[\n,;]+|\s+/).map(s=>s.trim()).filter(Boolean);const out=[];
   for(const tk of tokens){const c=parseColor(tk);if(c)out.push(c);if(out.length>=10)break;}
-  if(out.length){palette=out;positions=out.map(()=>null);roleOverrides={};render();}else alert('No valid colours found. Use hex or rgb().');
+  if(out.length){palette=out;positions=out.map(()=>null);shapes=out.map(()=>'circle');roleOverrides={};render();}else alert('No valid colours found. Use hex or rgb().');
 }
 document.getElementById('loadBtn').onclick=loadFromText;
 document.getElementById('dropBtn').onclick=eyedrop;
@@ -622,7 +690,9 @@ document.getElementById('pdfBtn').onclick=exportPDF;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 window.addEventListener('resize',()=>renderCanvas());
 
-palette=DEFAULT.map(parseColor);positions=palette.map(()=>null);
+document.getElementById('sanzoRand').onclick=()=>loadCombo(SANZO[Math.floor(Math.random()*SANZO.length)]);
+renderSanzo();
+palette=DEFAULT.map(parseColor);positions=palette.map(()=>null);shapes=palette.map(()=>'circle');
 document.getElementById('paste').value=DEFAULT.join('\n');
 render();
 </script>
