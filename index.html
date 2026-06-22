@@ -87,6 +87,9 @@
   .harmonyfab-extra{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
   .harmonyfab-extra:empty{display:none}
   .hpanel{background:var(--card);border:1.5px solid var(--line2);border-radius:16px;padding:14px;width:288px;box-shadow:0 16px 40px rgba(0,0,0,.22)}
+  .hfam{display:flex;gap:4px;background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:3px;margin-bottom:12px}
+  .hfam-b{flex:1;font-family:'Outfit';font-size:10.5px;font-weight:700;text-transform:lowercase;padding:5px 4px;border:none;background:transparent;color:var(--soft);border-radius:6px;cursor:pointer}
+  .hfam-b.on{background:var(--ink);color:var(--paper)}
   .hpanel-head{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:lowercase;color:var(--soft);margin-bottom:12px}
   .hpanel-row{display:flex;align-items:center;gap:9px;padding:7px;border-radius:10px;cursor:pointer;border:1.5px solid transparent}
   .hpanel-row:hover{background:var(--paper)}
@@ -94,7 +97,7 @@
   .hpanel-lab{font-size:11px;font-weight:700;width:42px;flex-shrink:0;color:var(--ink)}
   .hpanel-sw{display:flex;flex:1;height:26px;border-radius:6px;overflow:hidden;border:1px solid rgba(0,0,0,.08)}
   .hpanel-sw .hpsw{flex:1;display:block}
-  .hpanel-num{font-size:12px;font-weight:800;width:34px;text-align:right}
+  .hpanel-num{font-size:12px;font-weight:800;width:56px;text-align:right;white-space:nowrap}
   .hpanel-btns{display:flex;flex-direction:column;gap:8px;margin-top:12px}
   .hpanel-btns .btn{width:100%;text-align:center}
   .tok .dt{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:800;letter-spacing:.02em;background:rgba(255,255,255,.88);color:#111;padding:2px 7px;border-radius:6px;white-space:nowrap;pointer-events:none}
@@ -552,14 +555,15 @@ function minDeltaE(pal){let m=9;for(let i=0;i<pal.length;i++)for(let j=i+1;j<pal
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 /* Palettailor-style: simulated annealing that maximises the MINIMUM perceptual distance
    (separates similar hues, not just lightness). Seeded → deterministic per palette. */
-function harmonisePerceptual(pal){
+function harmonisePerceptual(pal,s){
   const n=pal.length;if(n<2)return pal.map(c=>c.slice());
-  const fast=s=>{const r=oklabToRgbRaw(s.L,s.C*Math.cos(s.h),s.C*Math.sin(s.h));return [clamp(r[0],0,255),clamp(r[1],0,255),clamp(r[2],0,255)];};
+  const driftW=(s&&s.drift!=null)?s.drift:0.18;
+  const fast=st=>{const r=oklabToRgbRaw(st.L,st.C*Math.cos(st.h),st.C*Math.sin(st.h));return [clamp(r[0],0,255),clamp(r[1],0,255),clamp(r[2],0,255)];};
   const orig=pal.map(c=>{const l=rgbToOklab(c);return {L:l[0],C:Math.hypot(l[1],l[2]),h:Math.atan2(l[2],l[1])};});
   const energy=st=>{const rg=st.map(fast);let mind=9;for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)mind=Math.min(mind,oklabDist(rg[i],rg[j]));
     let drift=0;for(let i=0;i<n;i++){const dh=Math.abs(st[i].h-orig[i].h);drift+=Math.abs(st[i].L-orig[i].L)*0.5+Math.abs(st[i].C-orig[i].C)*0.3+Math.min(dh,2*Math.PI-dh)/Math.PI*0.35;}
-    return mind-drift/n*0.18;};
-  const rnd=mulberry32(0x9E37+Math.round((pal[0][0]+1)*131+(pal[0][1]+1)*17+n*7));
+    return mind-drift/n*driftW;};
+  const rnd=mulberry32(0x9E37+Math.round((pal[0][0]+1)*131+(pal[0][1]+1)*17+n*7+driftW*1000));
   let cur=orig.map(s=>({...s})),cE=energy(cur),best=cur.map(s=>({...s})),bE=cE,T=0.16;
   for(let it=0;it<1600;it++){
     const cand=cur.map(s=>({...s})),k=(rnd()*n)|0;
@@ -574,12 +578,13 @@ function harmonisePerceptual(pal){
 }
 /* APCA / perceptual-lightness tuned: even OKLab-lightness steps (perceptually uniform → even APCA),
    chroma + hue preserved. */
-function harmoniseApca(pal){
+function harmoniseApca(pal,s){
   const n=pal.length;if(n<2)return pal.map(c=>c.slice());
+  const lo=(s&&s.lo!=null)?s.lo:0.05,hi=(s&&s.hi!=null)?s.hi:0.97,satM=(s&&s.sat)||1;
   const lch=pal.map(c=>{const l=rgbToOklab(c);return {L:l[0],C:Math.hypot(l[1],l[2]),h:Math.atan2(l[2],l[1])};});
   const order=pal.map((_,i)=>i).sort((a,b)=>lch[a].L-lch[b].L);
   const out=pal.map(c=>c.slice());
-  order.forEach((oi,rank)=>{out[oi]=oklchToRgb(n===1?0.5:0.05+0.92*rank/(n-1),lch[oi].C,lch[oi].h);});
+  order.forEach((oi,rank)=>{const L=n===1?(lo+hi)/2:lo+(hi-lo)*rank/(n-1);out[oi]=oklchToRgb(L,lch[oi].C*satM,lch[oi].h);});
   return out;
 }
 function avgContrast(pal){let s=0,n=0;for(let i=0;i<pal.length;i++)for(let j=i+1;j<pal.length;j++){s+=wcagRatio(pal[i],pal[j]);n++;}return n?s/n:1;}
@@ -587,11 +592,15 @@ function minContrast(pal){let m=99;for(let i=0;i<pal.length;i++)for(let j=i+1;j<
 
 /* Smart, deterministic harmonisation. Hues preserved; lightness solved against contrast targets. */
 const HARMONY_STRATS=[
-  {name:'max separation',type:'wcag',lo:0.0,hi:1.0,sat:1.0},
-  {name:'balanced',type:'wcag',lo:0.015,hi:0.96,sat:1.0},
-  {name:'vivid',type:'wcag',lo:0.02,hi:0.95,sat:1.28},
-  {name:'perceptual ΔE',type:'perceptual'},
-  {name:'APCA tuned',type:'apca'}
+  {name:'max separation',family:'wcag',type:'wcag',lo:0.0,hi:1.0,sat:1.0},
+  {name:'balanced',family:'wcag',type:'wcag',lo:0.015,hi:0.96,sat:1.0},
+  {name:'vivid',family:'wcag',type:'wcag',lo:0.02,hi:0.95,sat:1.28},
+  {name:'APCA wide',family:'apca',type:'apca',lo:0.04,hi:0.97,sat:1.0},
+  {name:'APCA balanced',family:'apca',type:'apca',lo:0.12,hi:0.9,sat:1.0},
+  {name:'APCA vivid',family:'apca',type:'apca',lo:0.06,hi:0.94,sat:1.22},
+  {name:'perceptual',family:'perceptual',type:'perceptual',drift:0.18},
+  {name:'perceptual vivid',family:'perceptual',type:'perceptual',drift:0.10},
+  {name:'perceptual tight',family:'perceptual',type:'perceptual',drift:0.30}
 ];
 /* Keep each colour's hue/order, but re-solve its lightness so that (luminance + 0.05)
    steps GEOMETRICALLY from dark to light. WCAG contrast between two colours is a ratio of
@@ -601,8 +610,8 @@ const HARMONY_STRATS=[
 function harmoniseSmart(pal,level){
   const n=pal.length;if(n<2)return pal.map(c=>c.slice());
   const s=HARMONY_STRATS[level%HARMONY_STRATS.length];
-  if(s.type==='perceptual')return harmonisePerceptual(pal);
-  if(s.type==='apca')return harmoniseApca(pal);
+  if(s.type==='perceptual')return harmonisePerceptual(pal,s);
+  if(s.type==='apca')return harmoniseApca(pal,s);
   const lums=pal.map(luminance);
   const order=pal.map((_,i)=>i).sort((a,b)=>lums[a]-lums[b]); // dark → light
   const Alo=s.lo+0.05,Ahi=s.hi+0.05;
@@ -614,32 +623,41 @@ function harmoniseSmart(pal,level){
   });
   return out;
 }
-let preHarmony=null,harmonyRanked=[],harmonyPos=0;
-/* build all variants, rank best-first by the weakest pair they produce */
+let preHarmony=null,harmonyRanked=[],harmonyPos=0,harmonyFamily='all';
+function vScore(p,fam){return fam==='perceptual'?minDeltaE(p):minContrast(p);}
+function fmtMetric(x,fam){return fam==='perceptual'?('ΔE '+x.toFixed(2)):(x.toFixed(2)+'×');}
+/* build variants for the chosen family (or all), rank best-first by that family's metric */
 function rankVariants(pal){
-  return HARMONY_STRATS.map((s,i)=>{const v=harmoniseSmart(pal,i);return {name:s.name,pal:v,min:minContrast(v)};})
-    .sort((a,b)=>b.min-a.min);
+  const sortFam=harmonyFamily==='all'?'wcag':harmonyFamily;
+  return HARMONY_STRATS.map((s,i)=>({s,i})).filter(o=>harmonyFamily==='all'||o.s.family===harmonyFamily)
+    .map(({s,i})=>({name:s.name,family:s.family,pal:harmoniseSmart(pal,i)}))
+    .sort((a,b)=>vScore(b.pal,sortFam)-vScore(a.pal,sortFam));
 }
 function applyHarmony(){const v=harmonyRanked[harmonyPos];palette=v.pal.map(c=>c.slice());positions=palette.map(()=>null);roleOverrides={};render();updateHarmonyUI(v);}
 function harmonise(){if(!preHarmony){pushUndo();preHarmony=palette.map(c=>c.slice());}harmonyRanked=rankVariants(preHarmony);harmonyPos=0;applyHarmony();}
 function reshuffleHarmony(){if(!preHarmony){harmonise();return;}harmonyPos=(harmonyPos+1)%harmonyRanked.length;applyHarmony();}
+function setHarmonyFamily(f){harmonyFamily=f;if(!preHarmony){harmonise();return;}harmonyRanked=rankVariants(preHarmony);harmonyPos=0;applyHarmony();}
 function keepHarmony(){preHarmony=null;updateHarmonyUI();}
 function revertHarmony(){if(preHarmony){palette=preHarmony.map(c=>c.slice());positions=palette.map(()=>null);preHarmony=null;render();}updateHarmonyUI();}
 function swatchRow(pal){return pal.map(c=>`<span class="hpsw" style="background:${toHex(c)}"></span>`).join('');}
 function updateHarmonyUI(v){
   const x=document.getElementById('harmonyExtra');if(!x)return;
   if(!preHarmony){x.innerHTML='';return;}
-  const mNew=minContrast(palette),mOld=minContrast(preHarmony),better=mNew>=mOld-0.001;
+  const fam=v?v.family:'wcag';
+  const mNew=vScore(palette,fam),mOld=vScore(preHarmony,fam),better=mNew>=mOld-0.001;
+  const fams=['all','wcag','apca','perceptual'];
   x.innerHTML=`<div class="hpanel">
-    <div class="hpanel-head">${v?v.name:''} · weakest pair (higher = better)</div>
-    <div class="hpanel-row sel" id="chooseNew"><span class="hpanel-lab">new →</span><span class="hpanel-sw">${swatchRow(palette)}</span><span class="hpanel-num" style="color:${better?'var(--pass)':'var(--fail)'}">${mNew.toFixed(2)}×</span></div>
-    <div class="hpanel-row" id="chooseOld"><span class="hpanel-lab">before</span><span class="hpanel-sw">${swatchRow(preHarmony)}</span><span class="hpanel-num">${mOld.toFixed(2)}×</span></div>
+    <div class="hfam">${fams.map(f=>`<button class="hfam-b${f===harmonyFamily?' on':''}" data-f="${f}">${f}</button>`).join('')}</div>
+    <div class="hpanel-head">${v?v.name:''} · ${fam==='perceptual'?'min ΔE':'weakest pair'} (higher = better)</div>
+    <div class="hpanel-row sel" id="chooseNew"><span class="hpanel-lab">new →</span><span class="hpanel-sw">${swatchRow(palette)}</span><span class="hpanel-num" style="color:${better?'var(--pass)':'var(--fail)'}">${fmtMetric(mNew,fam)}</span></div>
+    <div class="hpanel-row" id="chooseOld"><span class="hpanel-lab">before</span><span class="hpanel-sw">${swatchRow(preHarmony)}</span><span class="hpanel-num">${fmtMetric(mOld,fam)}</span></div>
     <div class="hpanel-btns">
       <button class="btn ghost sm" id="reHarm">↻ reshuffle (${harmonyPos+1}/${harmonyRanked.length})</button>
       <button class="btn ghost sm" id="peekHarm">⇄ hold to compare</button>
       <button class="btn sm" id="keepHarm">✓ keep new</button>
       <button class="btn ghost sm" id="revHarm">↺ keep original</button>
     </div></div>`;
+  x.querySelectorAll('.hfam-b').forEach(b=>b.onclick=()=>setHarmonyFamily(b.dataset.f));
   x.querySelector('#reHarm').onclick=reshuffleHarmony;
   x.querySelector('#keepHarm').onclick=keepHarmony;
   x.querySelector('#revHarm').onclick=revertHarmony;
