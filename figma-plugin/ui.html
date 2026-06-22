@@ -75,7 +75,7 @@
   .tok .circ{width:98px;height:98px;border-radius:50%;border:1px solid rgba(0,0,0,.08)}
   .tok .sq{width:96px;height:96px;border-radius:14px;border:1px solid rgba(0,0,0,.08)}
   .tok .arr{display:block}
-  .tok .typ{width:94px;height:94px;border-radius:18px;border:1px solid rgba(0,0,0,.08);position:relative;display:flex;align-items:center;justify-content:center}
+  .tok .typ{width:94px;height:94px;border-radius:18px;background:transparent;position:relative;display:flex;align-items:center;justify-content:center}
   .tok .typ .ty{font-size:28px;font-weight:800;letter-spacing:-.02em;outline:none;cursor:text;max-width:80px;overflow:hidden;white-space:nowrap;text-align:center;min-width:8px}
   .tok .typ .ty:empty::before{content:'type…';opacity:.4}
   .tok .typ .blob{position:absolute;right:8px;bottom:8px;width:16px;height:16px;border-radius:50%;border:1px solid rgba(0,0,0,.14)}
@@ -508,7 +508,7 @@ function tokenInner(c,shape,i){
   const hex=toHex(c);
   if(shape==='cube'){return `<div class="shape sq" style="background:${hex}"></div>`;}
   if(shape==='arrow'){return `<svg class="shape arr" viewBox="0 0 100 100" width="96" height="96"><path d="M8,38 H56 V17 L95,50 56,83 V62 H8 Z" fill="${hex}"/></svg>`;}
-  if(shape==='type'){const nb=onColor(c);const txt=(texts[i]!=null?texts[i]:'Ag')||'';return `<div class="shape typ" style="background:${nb}"><span class="ty" contenteditable="true" spellcheck="false" data-i="${i}" style="color:${hex};caret-color:${hex}">${txt.replace(/</g,'&lt;')}</span><i class="blob" style="background:${hex}"></i></div>`;}
+  if(shape==='type'){const txt=(texts[i]!=null?texts[i]:'Ag')||'';return `<div class="shape typ"><span class="ty" contenteditable="true" spellcheck="false" data-i="${i}" style="color:${hex};caret-color:${hex}">${txt.replace(/</g,'&lt;')}</span><i class="blob" style="background:${hex}"></i></div>`;}
   return `<div class="shape circ" style="background:${hex}"></div>`;
 }
 function renderCanvas(){
@@ -900,13 +900,11 @@ document.getElementById('paste').value=DEFAULT.join('\n');
 render();
 </script>
 <script>
-/* Figma plugin bridge */
 (function(){
   var pull=document.getElementById("pullBtn"),push=document.getElementById("pushBtn");
   if(pull)pull.onclick=function(){parent.postMessage({pluginMessage:{type:"pull"}},"*");};
   if(push)push.onclick=function(){try{if(palette&&palette.length)parent.postMessage({pluginMessage:{type:"push",colors:palette.map(toHex)}},"*");}catch(e){}};
-  window.onmessage=function(e){var m=e.data&&e.data.pluginMessage;if(!m)return;
-    if(m.type==="colors"&&m.colors&&m.colors.length){try{loadColors(m.colors);}catch(e){}}};
+  window.onmessage=function(e){var m=e.data&&e.data.pluginMessage;if(!m)return;if(m.type==="colors"&&m.colors&&m.colors.length){try{loadColors(m.colors);}catch(e){}}};
 })();
 </script>
 </body>
