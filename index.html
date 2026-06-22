@@ -80,6 +80,13 @@
   .tok .typ .ty:empty::before{content:'type…';opacity:.4}
   .tok .typ .blob{position:absolute;right:8px;bottom:8px;width:16px;height:16px;border-radius:50%;border:1px solid rgba(0,0,0,.14)}
   body.dropping::after{content:'drop image to extract colours';position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgba(16,15,14,.55);color:var(--paper);font-size:clamp(20px,3vw,32px);font-weight:700;letter-spacing:-.02em;pointer-events:none}
+  /* floating harmonise */
+  .harmonyfab{position:fixed;right:24px;bottom:24px;z-index:45;display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+  .harmonyfab .fab{width:60px;height:60px;border-radius:50%;border:none;background:var(--ink);color:var(--paper);font-size:24px;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;transition:transform .12s}
+  .harmonyfab .fab:hover{transform:translateY(-2px) rotate(18deg)}
+  .harmonyfab-extra{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+  .harmonyfab-extra:empty{display:none}
+  .harmonyfab-extra .btn{box-shadow:0 8px 22px rgba(0,0,0,.2)}
   .tok .dt{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:800;letter-spacing:.02em;background:rgba(255,255,255,.88);color:#111;padding:2px 7px;border-radius:6px;white-space:nowrap;pointer-events:none}
   .addblock{position:absolute;width:116px;height:116px;border:2px dashed var(--line2);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;background:rgba(255,255,255,.4);color:var(--soft);transition:.12s}
   .addblock span{font-size:38px;font-weight:300;line-height:.7}
@@ -265,8 +272,6 @@
     <button class="btn ghost sm" id="clipBtn">⧉ paste a colour</button>
     <button class="btn ghost sm" id="imgBtn">⊡ from screenshot</button>
     <button class="btn ghost sm" id="randBtn">⤫ random</button>
-    <button class="btn ghost sm" id="harmoniseBtn">✦ harmonise</button>
-    <span id="harmonyExtra" style="display:inline-flex;gap:10px"></span>
     <input type="file" id="imgInput" accept="image/*" style="display:none">
   </div>
   <div class="hint">tip: copy a screenshot and press ⌘/ctrl+V anywhere, or drop an image — colours are pulled out automatically.</div>
@@ -324,6 +329,11 @@
     <span class="akword">any&nbsp;key</span>
   </a>
 </footer>
+
+<div class="harmonyfab" id="harmonyFab">
+  <div class="harmonyfab-extra" id="harmonyExtra"></div>
+  <button class="fab" id="harmoniseBtn" title="Harmonise — boost palette contrast">✦</button>
+</div>
 
 <div class="fullprev" id="fullPrev"></div>
 
