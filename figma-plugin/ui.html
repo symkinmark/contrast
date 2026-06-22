@@ -76,8 +76,10 @@
   .tok .sq{width:96px;height:96px;border-radius:14px;border:1px solid rgba(0,0,0,.08)}
   .tok .arr{display:block}
   .tok .typ{width:94px;height:94px;border-radius:18px;border:1px solid rgba(0,0,0,.08);position:relative;display:flex;align-items:center;justify-content:center}
-  .tok .typ .ty{font-size:36px;font-weight:800;letter-spacing:-.02em}
+  .tok .typ .ty{font-size:28px;font-weight:800;letter-spacing:-.02em;outline:none;cursor:text;max-width:80px;overflow:hidden;white-space:nowrap;text-align:center;min-width:8px}
+  .tok .typ .ty:empty::before{content:'type…';opacity:.4}
   .tok .typ .blob{position:absolute;right:8px;bottom:8px;width:16px;height:16px;border-radius:50%;border:1px solid rgba(0,0,0,.14)}
+  body.dropping::after{content:'drop image to extract colours';position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgba(16,15,14,.55);color:var(--paper);font-size:clamp(20px,3vw,32px);font-weight:700;letter-spacing:-.02em;pointer-events:none}
   .tok .dt{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:800;letter-spacing:.02em;background:rgba(255,255,255,.88);color:#111;padding:2px 7px;border-radius:6px;white-space:nowrap;pointer-events:none}
   .addblock{position:absolute;width:116px;height:116px;border:2px dashed var(--line2);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;background:rgba(255,255,255,.4);color:var(--soft);transition:.12s}
   .addblock span{font-size:38px;font-weight:300;line-height:.7}
@@ -265,8 +267,11 @@
   <div class="pickrow">
     <button class="btn ghost sm" id="dropBtn">⛏ eyedropper</button>
     <button class="btn ghost sm" id="clipBtn">⧉ paste a colour</button>
+    <button class="btn ghost sm" id="imgBtn">⊡ from screenshot</button>
     <button class="btn ghost sm" id="randBtn">⤫ random</button>
+    <input type="file" id="imgInput" accept="image/*" style="display:none">
   </div>
+  <div class="hint">tip: copy a screenshot and press ⌘/ctrl+V anywhere, or drop an image — colours are pulled out automatically.</div>
   <div class="chips" id="chips"></div>
   <div class="sanzo">
     <div class="sanzohead">
@@ -381,6 +386,7 @@ function sizeMatrix(fg,bg){const r=wcagRatio(fg,bg),lc=Math.abs(apca(fg,bg));
 let palette=[];
 let positions=[];          // {x,y} parallel to palette, for canvas
 let shapes=[];             // token shape parallel to palette: circle|cube|arrow|type
+let texts=[];              // custom text for 'type' tokens, parallel to palette
 let roleOverrides={};       // role -> hex
 let roleLocks={};           // role -> true (kept fixed through shuffle)
 let bw=true;                // append black + white when loading dictionary combos
@@ -444,17 +450,52 @@ function renderChips(){
   if(palette.length<10){const add=document.createElement('div');add.className='chip addchip';add.id='addChip';add.textContent='+ Add';box.appendChild(add);}
   box.querySelectorAll('input[type=color]').forEach(inp=>inp.oninput=e=>{palette[+e.target.dataset.i]=parseColor(e.target.value);render();});
   box.querySelectorAll('.hx-in').forEach(inp=>inp.onchange=e=>{const p=parseColor(e.target.value);if(p)palette[+e.target.dataset.hex]=p;render();});
-  box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=e=>{const i=+e.target.dataset.rm;palette.splice(i,1);positions.splice(i,1);shapes.splice(i,1);render();});
+  box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=e=>{const i=+e.target.dataset.rm;palette.splice(i,1);positions.splice(i,1);shapes.splice(i,1);texts.splice(i,1);render();});
   const ac=document.getElementById('addChip');if(ac)ac.onclick=()=>addColour([200,200,200]);
 }
-function addColour(c){if(palette.length>=10)return;palette.push(c);positions.push(null);shapes.push('circle');render();}
+function addColour(c){if(palette.length>=10)return;palette.push(c);positions.push(null);shapes.push('circle');texts.push('Ag');render();}
 function loadCombo(arr){
   let cols=arr.slice();
   if(bw){if(!cols.includes('#000000'))cols.push('#000000');if(!cols.includes('#FFFFFF'))cols.push('#FFFFFF');}
   cols=cols.slice(0,10);
-  palette=cols.map(parseColor).filter(Boolean);positions=palette.map(()=>null);shapes=palette.map(()=>'circle');
+  palette=cols.map(parseColor).filter(Boolean);positions=palette.map(()=>null);shapes=palette.map(()=>'circle');texts=palette.map(()=>'Ag');
   roleOverrides={};roleLocks={};render();
 }
+/* set palette directly from a list of hexes (image extraction) — no B&W injection */
+function loadColors(hexes){
+  const cols=hexes.map(parseColor).filter(Boolean).slice(0,10);
+  if(!cols.length)return;
+  palette=cols;positions=palette.map(()=>null);shapes=palette.map(()=>'circle');texts=palette.map(()=>'Ag');
+  roleOverrides={};roleLocks={};render();
+}
+/* extract dominant distinct colours from an image */
+function extractColors(file){
+  const img=new Image();
+  img.onload=()=>{
+    const max=200,sc=Math.min(1,max/Math.max(img.width,img.height));
+    const w=Math.max(1,Math.round(img.width*sc)),h=Math.max(1,Math.round(img.height*sc));
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+    const ctx=cv.getContext('2d');ctx.drawImage(img,0,0,w,h);
+    let data;try{data=ctx.getImageData(0,0,w,h).data;}catch(e){alert('Could not read that image.');return;}
+    const map=new Map();
+    for(let p=0;p<data.length;p+=4){
+      if(data[p+3]<128)continue;
+      const r=data[p],g=data[p+1],b=data[p+2];
+      const key=((r&0xF0)<<8)|((g&0xF0)<<4)|(b&0xF0);
+      let e=map.get(key);if(!e){e={r:0,g:0,b:0,n:0};map.set(key,e);}
+      e.r+=r;e.g+=g;e.b+=b;e.n++;
+    }
+    let buckets=[...map.values()].map(e=>({rgb:[Math.round(e.r/e.n),Math.round(e.g/e.n),Math.round(e.b/e.n)],n:e.n}));
+    buckets.sort((a,b)=>b.n-a.n);
+    const out=[];
+    for(const bk of buckets){if(out.some(o=>colDist(o,bk.rgb)<30))continue;out.push(bk.rgb);if(out.length>=10)break;}
+    if(out.length)loadColors(out.map(toHex));else alert('No colours found in that image.');
+    URL.revokeObjectURL(img.src);
+  };
+  img.onerror=()=>alert('Could not load that image.');
+  img.src=URL.createObjectURL(file);
+}
+function handleImageInput(e){const f=e.target.files&&e.target.files[0];if(f)extractColors(f);e.target.value='';}
 function renderSanzo(){
   const strip=document.getElementById('sanzostrip');if(!strip)return;
   strip.innerHTML=SANZO.map((c,i)=>`<button class="combo" data-k="${i}" title="combination ${i+1}">${c.map(h=>`<span class="band" style="background:${h}"></span>`).join('')}<span class="cn">${i+1}</span></button>`).join('');
@@ -463,11 +504,11 @@ function renderSanzo(){
 
 /* canvas */
 function shade(c,amt){return c.map(v=>clamp(amt>0?v+(255-v)*amt:v*(1+amt),0,255)|0);}
-function tokenInner(c,shape){
+function tokenInner(c,shape,i){
   const hex=toHex(c);
   if(shape==='cube'){return `<div class="shape sq" style="background:${hex}"></div>`;}
   if(shape==='arrow'){return `<svg class="shape arr" viewBox="0 0 100 100" width="96" height="96"><path d="M8,38 H56 V17 L95,50 56,83 V62 H8 Z" fill="${hex}"/></svg>`;}
-  if(shape==='type'){const nb=onColor(c);return `<div class="shape typ" style="background:${nb}"><span class="ty" style="color:${hex}">Ag</span><i class="blob" style="background:${hex}"></i></div>`;}
+  if(shape==='type'){const nb=onColor(c);const txt=(texts[i]!=null?texts[i]:'Ag')||'';return `<div class="shape typ" style="background:${nb}"><span class="ty" contenteditable="true" spellcheck="false" data-i="${i}" style="color:${hex};caret-color:${hex}">${txt.replace(/</g,'&lt;')}</span><i class="blob" style="background:${hex}"></i></div>`;}
   return `<div class="shape circ" style="background:${hex}"></div>`;
 }
 function renderCanvas(){
@@ -480,9 +521,16 @@ function renderCanvas(){
     positions[i].x=clamp(positions[i].x,4,W-sz-4);positions[i].y=clamp(positions[i].y,4,H-sz-4);
     const t=document.createElement('div');t.className='tok '+shapes[i];
     t.style.left=positions[i].x+'px';t.style.top=positions[i].y+'px';t.dataset.i=i;
-    t.innerHTML=tokenInner(c,shapes[i])+`<span class="dt">${toHex(c)}</span>`;
+    t.innerHTML=tokenInner(c,shapes[i],i)+`<span class="dt">${toHex(c)}</span>`;
     dragify(t,i,cv);
     t.ondblclick=ev=>{ev.preventDefault();ev.stopPropagation();openShapePicker(cv,i);};
+    const ty=t.querySelector('.ty');
+    if(ty){
+      ty.addEventListener('pointerdown',ev=>ev.stopPropagation());
+      ty.addEventListener('dblclick',ev=>ev.stopPropagation());
+      ty.addEventListener('input',()=>{texts[i]=ty.textContent;});
+      ty.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();ty.blur();}});
+    }
     cv.appendChild(t);
   });
   if(palette.length<10){
@@ -521,7 +569,7 @@ function dragify(d,i,cv){
 }
 function reorderByX(){
   const idx=palette.map((_,i)=>i).sort((a,b)=>positions[a].x-positions[b].x);
-  palette=idx.map(i=>palette[i]);positions=idx.map(i=>positions[i]);shapes=idx.map(i=>shapes[i]);
+  palette=idx.map(i=>palette[i]);positions=idx.map(i=>positions[i]);shapes=idx.map(i=>shapes[i]);texts=idx.map(i=>texts[i]);
   render();
 }
 
@@ -814,12 +862,27 @@ function loadFromText(){
   const raw=document.getElementById('paste').value;
   const tokens=raw.split(/[\n,;]+|\s+/).map(s=>s.trim()).filter(Boolean);const out=[];
   for(const tk of tokens){const c=parseColor(tk);if(c)out.push(c);if(out.length>=10)break;}
-  if(out.length){palette=out;positions=out.map(()=>null);shapes=out.map(()=>'circle');roleOverrides={};render();}else alert('No valid colours found. Use hex or rgb().');
+  if(out.length){palette=out;positions=out.map(()=>null);shapes=out.map(()=>'circle');texts=out.map(()=>'Ag');roleOverrides={};render();}else alert('No valid colours found. Use hex or rgb().');
 }
 document.getElementById('loadBtn').onclick=loadFromText;
 document.getElementById('dropBtn').onclick=eyedrop;
 document.getElementById('clipBtn').onclick=pasteColour;
 document.getElementById('randBtn').onclick=randomColour;
+document.getElementById('imgBtn').onclick=()=>document.getElementById('imgInput').click();
+document.getElementById('imgInput').onchange=handleImageInput;
+/* paste a screenshot from the clipboard */
+document.addEventListener('paste',e=>{
+  const items=(e.clipboardData||{}).items||[];
+  for(const it of items){if(it.type&&it.type.indexOf('image')===0){const f=it.getAsFile();if(f){e.preventDefault();extractColors(f);return;}}}
+});
+/* drag & drop an image anywhere */
+document.addEventListener('dragover',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')){e.preventDefault();document.body.classList.add('dropping');}});
+document.addEventListener('dragleave',e=>{if(e.relatedTarget===null)document.body.classList.remove('dropping');});
+document.addEventListener('drop',e=>{
+  document.body.classList.remove('dropping');
+  const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+  if(f&&f.type.indexOf('image')===0){e.preventDefault();extractColors(f);}
+});
 document.getElementById('shuffleBtn').onclick=shuffleRoles;
 document.getElementById('fullBtn').onclick=openFull;
 document.getElementById('htmlBtn').onclick=exportHTML;
@@ -832,7 +895,7 @@ function renderBwToggle(){const b=document.getElementById('bwToggle');if(!b)retu
 document.getElementById('bwToggle').onclick=()=>{bw=!bw;renderBwToggle();};
 renderBwToggle();
 renderSanzo();
-palette=DEFAULT.map(parseColor);positions=palette.map(()=>null);shapes=palette.map(()=>'circle');
+palette=DEFAULT.map(parseColor);positions=palette.map(()=>null);shapes=palette.map(()=>'circle');texts=palette.map(()=>'Ag');
 document.getElementById('paste').value=DEFAULT.join('\n');
 render();
 </script>
@@ -843,7 +906,7 @@ render();
   if(pull)pull.onclick=function(){parent.postMessage({pluginMessage:{type:"pull"}},"*");};
   if(push)push.onclick=function(){try{if(palette&&palette.length)parent.postMessage({pluginMessage:{type:"push",colors:palette.map(toHex)}},"*");}catch(e){}};
   window.onmessage=function(e){var m=e.data&&e.data.pluginMessage;if(!m)return;
-    if(m.type==="colors"&&m.colors&&m.colors.length){try{loadCombo(m.colors);}catch(e){}}};
+    if(m.type==="colors"&&m.colors&&m.colors.length){try{loadColors(m.colors);}catch(e){}}};
 })();
 </script>
 </body>
