@@ -512,46 +512,54 @@ function minContrast(pal){let m=99;for(let i=0;i<pal.length;i++)for(let j=i+1;j<
 
 /* Smart, deterministic harmonisation. Hues preserved; lightness solved against contrast targets. */
 const HARMONY_STRATS=[
-  {name:'max separation',lo:0.02,hi:0.97,sat:1.0},
-  {name:'even tonal spread',lo:0.05,hi:0.90,sat:1.0},
-  {name:'vivid spread',lo:0.06,hi:0.90,sat:1.22},
-  {name:'soft spread',lo:0.16,hi:0.84,sat:1.0}
+  {name:'max separation',lo:0.0,hi:1.0,sat:1.0},
+  {name:'balanced',lo:0.015,hi:0.96,sat:1.0},
+  {name:'vivid',lo:0.02,hi:0.95,sat:1.28},
+  {name:'soft',lo:0.05,hi:0.9,sat:1.0}
 ];
-/* Spread colours evenly across the luminance axis (dark→light) by their existing rank,
-   preserving hue. This provably raises the minimum and average pairwise contrast,
-   because no two colours can share the same luminance band. Deterministic. */
+/* Keep each colour's hue/order, but re-solve its lightness so that (luminance + 0.05)
+   steps GEOMETRICALLY from dark to light. WCAG contrast between two colours is a ratio of
+   (Y+0.05) terms, so geometric spacing equalises the contrast ratio between every adjacent
+   pair — which maximises the weakest pair. (Even *linear* luminance spacing fails here:
+   equal luminance gaps give tiny ratios at the light end.) Deterministic. */
 function harmoniseSmart(pal,level){
   const n=pal.length;if(n<2)return pal.map(c=>c.slice());
   const s=HARMONY_STRATS[level%HARMONY_STRATS.length];
   const lums=pal.map(luminance);
   const order=pal.map((_,i)=>i).sort((a,b)=>lums[a]-lums[b]); // dark → light
+  const Alo=s.lo+0.05,Ahi=s.hi+0.05;
   const out=pal.map(c=>c.slice());
   order.forEach((oi,rank)=>{
-    const t=n===1?(s.lo+s.hi)/2:s.lo+(s.hi-s.lo)*rank/(n-1);
+    const f=n===1?0.5:rank/(n-1);
+    const t=clamp(Alo*Math.pow(Ahi/Alo,f)-0.05,0,1);
     let c=withLuminance(pal[oi],t);
     if(s.sat!==1){const hsl=rgbToHsl(c);c=hslToRgb(hsl[0],clamp(hsl[1]*s.sat,0,1),hsl[2]);}
     out[oi]=c;
   });
   return out;
 }
-let preHarmony=null,harmonyLevel=0;
-function applyHarmony(){palette=harmoniseSmart(preHarmony,harmonyLevel).map(c=>c.slice());positions=palette.map(()=>null);roleOverrides={};render();updateHarmonyUI();}
-function harmonise(){if(!preHarmony)preHarmony=palette.map(c=>c.slice());harmonyLevel=0;applyHarmony();}
-function reshuffleHarmony(){if(!preHarmony){harmonise();return;}harmonyLevel=(harmonyLevel+1)%HARMONY_STRATS.length;applyHarmony();}
+let preHarmony=null,harmonyRanked=[],harmonyPos=0;
+/* build all variants, rank best-first by the weakest pair they produce */
+function rankVariants(pal){
+  return HARMONY_STRATS.map((s,i)=>{const v=harmoniseSmart(pal,i);return {name:s.name,pal:v,min:minContrast(v)};})
+    .sort((a,b)=>b.min-a.min);
+}
+function applyHarmony(){const v=harmonyRanked[harmonyPos];palette=v.pal.map(c=>c.slice());positions=palette.map(()=>null);roleOverrides={};render();updateHarmonyUI(v);}
+function harmonise(){if(!preHarmony)preHarmony=palette.map(c=>c.slice());harmonyRanked=rankVariants(preHarmony);harmonyPos=0;applyHarmony();}
+function reshuffleHarmony(){if(!preHarmony){harmonise();return;}harmonyPos=(harmonyPos+1)%harmonyRanked.length;applyHarmony();}
 function keepHarmony(){preHarmony=null;updateHarmonyUI();}
 function revertHarmony(){if(preHarmony){palette=preHarmony.map(c=>c.slice());positions=palette.map(()=>null);preHarmony=null;render();}updateHarmonyUI();}
 function swatchRow(pal){return pal.map(c=>`<span class="hpsw" style="background:${toHex(c)}"></span>`).join('');}
-function updateHarmonyUI(){
+function updateHarmonyUI(v){
   const x=document.getElementById('harmonyExtra');if(!x)return;
   if(!preHarmony){x.innerHTML='';return;}
-  const strat=HARMONY_STRATS[harmonyLevel];
-  const aNew=avgContrast(palette),aOld=avgContrast(preHarmony);
+  const mNew=minContrast(palette),mOld=minContrast(preHarmony),better=mNew>=mOld-0.001;
   x.innerHTML=`<div class="hpanel">
-    <div class="hpanel-head">${strat.name} · variant ${harmonyLevel+1}/${HARMONY_STRATS.length}</div>
-    <div class="hpanel-row sel" id="chooseNew"><span class="hpanel-lab">new →</span><span class="hpanel-sw">${swatchRow(palette)}</span><span class="hpanel-num">${aNew.toFixed(1)}×</span></div>
-    <div class="hpanel-row" id="chooseOld"><span class="hpanel-lab">before</span><span class="hpanel-sw">${swatchRow(preHarmony)}</span><span class="hpanel-num">${aOld.toFixed(1)}×</span></div>
+    <div class="hpanel-head">${v?v.name:''} · weakest pair (higher = better)</div>
+    <div class="hpanel-row sel" id="chooseNew"><span class="hpanel-lab">new →</span><span class="hpanel-sw">${swatchRow(palette)}</span><span class="hpanel-num" style="color:${better?'var(--pass)':'var(--fail)'}">${mNew.toFixed(2)}×</span></div>
+    <div class="hpanel-row" id="chooseOld"><span class="hpanel-lab">before</span><span class="hpanel-sw">${swatchRow(preHarmony)}</span><span class="hpanel-num">${mOld.toFixed(2)}×</span></div>
     <div class="hpanel-btns">
-      <button class="btn ghost sm" id="reHarm">↻ reshuffle</button>
+      <button class="btn ghost sm" id="reHarm">↻ reshuffle (${harmonyPos+1}/${harmonyRanked.length})</button>
       <button class="btn sm" id="keepHarm">✓ keep new</button>
       <button class="btn ghost sm" id="revHarm">↺ keep original</button>
     </div></div>`;
