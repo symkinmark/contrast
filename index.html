@@ -503,6 +503,35 @@ function withLuminance(c,target){
   for(let k=0;k<26;k++){mid=(lo+hi)/2;if(luminance(hslToRgb(h,s,mid))<target)lo=mid;else hi=mid;}
   return hslToRgb(h,s,(lo+hi)/2);
 }
+
+/* ---- OKLab / OKLCH (Björn Ottosson) — perceptually uniform; lets us change lightness while keeping chroma ---- */
+function srgbLin(c){c/=255;return c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4);}
+function linSrgb(c){return 255*(c<=0.0031308?12.92*c:1.055*Math.pow(c,1/2.4)-0.055);}
+function rgbToOklab(rgb){
+  const r=srgbLin(rgb[0]),g=srgbLin(rgb[1]),b=srgbLin(rgb[2]);
+  const l=Math.cbrt(0.4122214708*r+0.5363325363*g+0.0514459929*b);
+  const m=Math.cbrt(0.2119034982*r+0.6806995451*g+0.1073969566*b);
+  const s=Math.cbrt(0.0883024619*r+0.2817188376*g+0.6299787005*b);
+  return [0.2104542553*l+0.7936177850*m-0.0040720468*s,1.9779984951*l-2.4285922050*m+0.4505937099*s,0.0259040371*l+0.7827717662*m-0.8086757660*s];
+}
+function oklabToRgbRaw(L,a,b){
+  const l=Math.pow(L+0.3963377774*a+0.2158037573*b,3),m=Math.pow(L-0.1055613458*a-0.0638541728*b,3),s=Math.pow(L-0.0894841775*a-1.2914855480*b,3);
+  return [linSrgb(4.0767416621*l-3.3077115913*m+0.2309699292*s),linSrgb(-1.2684380046*l+2.6097574011*m-0.3413193965*s),linSrgb(-0.0041960863*l-0.7034186147*m+1.7076147010*s)];
+}
+function inGamut(rgb){return rgb.every(v=>v>=-0.4&&v<=255.4);}
+/* render OKLCH → sRGB, reducing chroma until inside the sRGB gamut (keeps hue + lightness, max chroma) */
+function oklchToRgb(L,C,h){
+  let rgb=oklabToRgbRaw(L,C*Math.cos(h),C*Math.sin(h));
+  if(!inGamut(rgb)){let lo=0,hi=C;for(let k=0;k<18;k++){const c=(lo+hi)/2;if(inGamut(oklabToRgbRaw(L,c*Math.cos(h),c*Math.sin(h))))lo=c;else hi=c;}rgb=oklabToRgbRaw(L,lo*Math.cos(h),lo*Math.sin(h));}
+  return rgb.map(v=>clamp(Math.round(v),0,255));
+}
+/* set a colour to a target WCAG relative luminance, preserving OKLCH hue and (scaled) chroma — vivid, not washed */
+function setLumOK(c,targetY,chromaMul){
+  const lab=rgbToOklab(c);let C=Math.hypot(lab[1],lab[2])*(chromaMul||1);const h=Math.atan2(lab[2],lab[1]);
+  let lo=0,hi=1,L=0.5;
+  for(let k=0;k<22;k++){L=(lo+hi)/2;if(luminance(oklchToRgb(L,C,h))<targetY)lo=L;else hi=L;}
+  return oklchToRgb((lo+hi)/2,C,h);
+}
 function avgContrast(pal){let s=0,n=0;for(let i=0;i<pal.length;i++)for(let j=i+1;j<pal.length;j++){s+=wcagRatio(pal[i],pal[j]);n++;}return n?s/n:1;}
 function minContrast(pal){let m=99;for(let i=0;i<pal.length;i++)for(let j=i+1;j<pal.length;j++)m=Math.min(m,wcagRatio(pal[i],pal[j]));return m===99?1:m;}
 
@@ -528,9 +557,7 @@ function harmoniseSmart(pal,level){
   order.forEach((oi,rank)=>{
     const f=n===1?0.5:rank/(n-1);
     const t=clamp(Alo*Math.pow(Ahi/Alo,f)-0.05,0,1);
-    let c=withLuminance(pal[oi],t);
-    if(s.sat!==1){const hsl=rgbToHsl(c);c=hslToRgb(hsl[0],clamp(hsl[1]*s.sat,0,1),hsl[2]);}
-    out[oi]=c;
+    out[oi]=setLumOK(pal[oi],t,s.sat); // OKLCH: hits target contrast while keeping chroma (no wash-out)
   });
   return out;
 }
